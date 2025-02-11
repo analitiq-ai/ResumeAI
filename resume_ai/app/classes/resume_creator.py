@@ -15,7 +15,8 @@ from resume_ai.app.funcs import (
     run_shell_cmd,
     text_to_filename,
     get_custom_instructions,
-    display_matching_scores
+    display_matching_scores,
+    clean_empty
 )
 from resume_ai.app.constants import (
     RESUMES_NEW_YAML_DIR_PATH
@@ -108,7 +109,9 @@ class ResumeCreator:
         job_file_name_without_extension = text_to_filename(job_title)
 
         response = self.llm_client.invoke_llm(prompt, job_description, parser)
-        new_cv_dict = response["cv"]
+
+        # LLM has a tendency to add empty items, like `extracurricular_activities: []`. We should remove them as rendercv throws an error.
+        new_cv_dict = clean_empty(response["cv"])
 
         # Merge generated CV into the example YAML
         job_specific_yaml = self.example_yaml.copy()

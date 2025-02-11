@@ -13,11 +13,11 @@ Do not invent skills or knowledge that is not strongly implied from my current r
 ```
 {job}
 ```
-Your response should be my new resume in YAML format, adapted to match the job description.
-The YAML format example is provided bellow.
+Your response should be my new resume, adapted to match the job description provided back to me as per format instructions.
 It is important to stick with the same structure of each attribute as in the example.
-You can omit any attributes that are not applicable to my resume from your yaml response.
-Rather than providing empty attribute in your response, omit the entire attribute, e.g. instead of returning `publications: []:`, omit the entire attribute `publications` if my resume has no publications.
+You can omit any attributes that are not applicable to my resume from your response.
+Use example as a guide for resume structure. 
+You can update the content of any attribute but you cannot change the structure of the attributes.
 ## Example:
 ```
 {example}

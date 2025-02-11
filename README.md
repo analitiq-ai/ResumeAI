@@ -6,7 +6,7 @@ ResumeAI is an intelligent resume creation tool that leverages Large Language Mo
 
 ## Key Features
 
-- **AI-Powered Resume Generation**: Automatically creates tailored resumes for specific job descriptions using LLMs
+- **AI-Powered Resume Generation**: Automatically creates tailored resumes for specific job descriptions using LLMs of your choice (Bedrock and OpenAI are supported)
 - **Smart Resume Matching**: Compares both your current and newly generated resume against job requirements with detailed scoring
 - **Multiple Input Methods**: Process job descriptions from:
     - Text files (.txt)

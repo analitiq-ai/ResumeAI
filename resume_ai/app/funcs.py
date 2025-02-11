@@ -81,18 +81,19 @@ def load_yaml(file_name):
         logging.error(f"An unexpected error occurred: {e}")
 
 
-def load_pdf(file_path):
+def load_pdf(file_path) -> str or None:
     """
-    This function loads a PDF file from the specified file path, divides it into pages,
-    and returns the document content. It utilizes the PyPDFLoader to process the PDF
-    file. If the file does not exist, it raises a `FileNotFoundError`, or if another
-    unexpected issue occurs, it handles it and prints an error message.
+    Loads the content of a PDF file and returns it as a single concatenated string
+    of all pages' text. The function splits the PDF document into individual pages
+    and extracts the textual content from each. If the file is not found, it raises
+    a FileNotFoundError, and for any other unexpected errors, it logs the error
+    message without terminating the process.
 
-    :param file_path: The path to the PDF file to be loaded.
+    :param file_path: Path to the PDF file to be loaded.
     :type file_path: str
-
-    :return: A list of documents representing the individual pages of the PDF.
-    :rtype: list
+    :return: A single string containing concatenated textual content of the PDF
+        pages, or None if an error occurs.
+    :rtype: str or None
     """
     try:
         # Initialize PDF Loader
@@ -100,7 +101,8 @@ def load_pdf(file_path):
 
         # Load documents (splits the PDF into pages)
         documents = loader.load()
-        return documents
+
+        return " ".join([doc.page_content for doc in documents])
 
     except FileNotFoundError:
         print(f"Error: File '{file_path}' not found.")
@@ -160,8 +162,19 @@ def run_shell_cmd(cmd):
         print("Command executed successfully.")
         print(result.stdout)
     else:
-        print("Command execution failed.")
-        print(result.stderr)
+        error_msg = f"""
+Command execution failed with return code: {result.returncode}
+STDERR: {result.stderr}
+STDOUT: {result.stdout}
+Command: {cmd}
+"""
+        logging.error(error_msg)
+        raise subprocess.CalledProcessError(
+            returncode=result.returncode,
+            cmd=cmd,
+            output=result.stdout,
+            stderr=result.stderr
+        )
 
 def load_json(file_path):
     """
@@ -336,3 +349,21 @@ def display_matching_scores(response):
     console.print("\n")
     console.print(analysis_panel)
     console.print("\n")
+
+def clean_empty(d):
+    """
+    Recursively remove empty lists, empty dictionaries, or None values from a dictionary
+
+    :param d: Input dictionary or list
+    :return: Cleaned dictionary or list with empty values removed
+    """
+    if isinstance(d, dict):
+        return {
+            k: v
+            for k, v in ((k, clean_empty(v)) for k, v in d.items())
+            if v not in (None, [], {})
+        }
+    elif isinstance(d, list):
+        return [v for v in (clean_empty(v) for v in d) if v not in (None, "", [], {})]
+    else:
+        return d

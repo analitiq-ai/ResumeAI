@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "resume_ai"
+version = "0.1.0"
+description = ""
+authors = ["Kirill Andriychuk <llirik.a@analitiq.ai>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+rendercv = {extras = ["full"], version = "^2.1"}
+boto3 = "^1.36.12"
+langchain-aws = "^0.2.12"
+langchain = "^0.3.17"
+pyyaml = "^6.0.2"
+langchain-community = "^0.3.16"
+pypdf = "^5.2.0"
+html2text = "^2024.2.26"
+bs4 = "^0.0.2"
+langchain-openai = "^0.3.3"
+reportlab = "^4.3.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,12 @@
+Responsibilities
+Work closely with business owners and digital product owners to to gather reporting requirements and understand their data needs
+Hereby work with sales, marketing, technology, user experience, product, and design teams, applying your data expertise to solve customer pain-points
+Develop and maintain reporting dashboards using data visualization tools such as Tableau and Looker
+Use a combination of data sets to conduct analysis, providing actionable insights and recommendations for optimization through experimentation
+Provide regular reports and ad-hoc analysis to support decision-making processes
+Profile
+Excellent written and verbal communication skills and the ability to make an acurate requirements analysis with the different stakeholders such as business,operations, marketing, finace, etc.
+Experience delivering hands-on digital analytics of various data sets, including web performance, transactional, operational, CRM and marketing
+Strong experience in building intuitive reports and dashboards using tools such as Tableau, Looker or PowerBI with the ability to translate complex analysis into well-structured and simple-to-understand presentations and recommendations
+Proficiency in SQL and data querying techniques
+Familiarity with digital analytics tools like Google Analytics 4 (GA4), and understanding of digital media mechanics, SEO, PPC, display and affiliates

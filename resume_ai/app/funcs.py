@@ -1,0 +1,338 @@
+import os
+import re
+import yaml
+import json
+import subprocess
+import shutil
+import logging
+from pathlib import Path
+from langchain_community.document_loaders import PyPDFLoader
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich import box
+
+def extract_yaml_from_string(input_string):
+    """
+    Extract YAML block from a string enclosed between ```yaml and ``` backticks and convert it to a Python dictionary.
+
+    Args:
+        input_string (str): The string containing the YAML block.
+
+    Returns:
+        dict: Parsed YAML content as a dictionary, or None if no YAML block is found.
+    """
+    # Define a regular expression to match the YAML block
+    yaml_pattern = re.compile(r"```yaml\n(.*?)\n```", re.DOTALL)
+    match = yaml_pattern.search(input_string)
+
+    if match:
+        yaml_content = match.group(1)
+        try:
+            # Parse the YAML content into a Python dictionary
+            parsed_yaml = yaml.safe_load(yaml_content)
+            return parsed_yaml
+        except yaml.YAMLError as e:
+            print("Error parsing YAML:", e)
+            return None
+    else:
+        print("No valid YAML block found in the input string.")
+        return None
+
+def save_yaml_to_file(data, filename):
+    """
+    Save a dictionary to a file in YAML format.
+
+    Args:
+        data (dict): The data to save.
+        filename (str): The file path where the YAML content will be saved.
+    """
+    try:
+        with open(filename, 'w') as file:
+            yaml.dump(data, file, default_flow_style=False)
+        logging.debug(f"YAML saved successfully to {filename}")
+    except Exception as e:
+        logging.error("Error saving YAML to file:", e)
+
+
+def load_yaml(file_name):
+    """
+    Load the contents of a YAML file into a Python dictionary. This function reads a
+    YAML file specified by its file name, parses the content using a safe YAML loader,
+    and returns the parsed data as a dictionary. If the file does not exist, cannot
+    be parsed, or an unexpected error occurs, the function logs the respective error.
+
+    :param file_name: The path to the YAML file to load.
+    :type file_name: str
+    :return: The contents of the YAML file loaded into a Python dictionary.
+    :rtype: dict or None
+    """
+    try:
+        # Open the YAML file
+        with open(file_name, 'r') as file:
+            # Load the content into a Python dictionary
+            yaml_data = yaml.safe_load(file)
+            return yaml_data
+    except FileNotFoundError:
+        logging.error(f"Error: File '{file_name}' not found.")
+    except yaml.YAMLError as e:
+        logging.error(f"Error parsing YAML file: {e}")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
+
+
+def load_pdf(file_path):
+    """
+    This function loads a PDF file from the specified file path, divides it into pages,
+    and returns the document content. It utilizes the PyPDFLoader to process the PDF
+    file. If the file does not exist, it raises a `FileNotFoundError`, or if another
+    unexpected issue occurs, it handles it and prints an error message.
+
+    :param file_path: The path to the PDF file to be loaded.
+    :type file_path: str
+
+    :return: A list of documents representing the individual pages of the PDF.
+    :rtype: list
+    """
+    try:
+        # Initialize PDF Loader
+        loader = PyPDFLoader(file_path)
+
+        # Load documents (splits the PDF into pages)
+        documents = loader.load()
+        return documents
+
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+
+def load_txt_files_from_directory(directory_path):
+    """
+    Load all .txt files from the specified directory, parse their content,
+    and extract file names (without extension).
+
+    Args:
+        directory_path (str): Path to the directory containing .txt files.
+
+    Returns:
+        list: A list of dictionaries, each containing 'file_name' and 'content' keys.
+    """
+    parsed_files = []
+
+    # Iterate through all files in the directory
+    for file_name in os.listdir(directory_path):
+        if file_name.endswith(".txt"):
+            file_path = os.path.join(directory_path, file_name)
+
+            # Open and read the file content
+            with open(file_path, 'r') as file:
+                content = file.read()
+
+            # Add parsed content and file name to the list
+            parsed_files.append({
+                'file_name': file_name,
+                'content': content
+            })
+
+    return parsed_files
+
+def run_shell_cmd(cmd):
+    """
+    Executes a given shell command and captures its output and execution status.
+
+    This function utilizes the subprocess.run method to execute
+    a shell command in a controlled environment. It captures
+    both the standard output and the standard error, evaluates
+    the command's return code, and prints the appropriate
+    output message indicating success or failure.
+
+    :param cmd: The shell command to be executed.
+    :type cmd: str
+    :return: None
+    """
+    # Execute the command in the shell
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+    # Check the command's output and status
+    if result.returncode == 0:
+        print("Command executed successfully.")
+        print(result.stdout)
+    else:
+        print("Command execution failed.")
+        print(result.stderr)
+
+def load_json(file_path):
+    """
+    Loads a JSON file from the given file path and parses its contents.
+
+    This function attempts to open the specified file path and load its content
+    as JSON. If the file does not exist or is not a valid JSON format, an error
+    message is displayed and the program exits.
+
+    :param file_path: The path to the JSON file that needs to be loaded.
+    :type file_path: str
+    :return: The parsed data as a dictionary or list, depending on the JSON structure.
+    :rtype: dict | list
+    :raises FileNotFoundError: Raised when the specified file cannot be found.
+    :raises json.JSONDecodeError: Raised when the file contains invalid JSON formatting.
+    :raises Exception: Raised for any other unexpected exception during file loading.
+    """
+    try:
+        # Load the json file
+        with open(file_path, 'r') as json_file:
+            config_data = json.load(json_file)
+
+        return config_data
+
+    except FileNotFoundError:
+        exit(f"File not found at path: {file_path}")
+
+    except json.JSONDecodeError:
+        exit("Error decoding file. Ensure it is properly formatted JSON.")
+
+    except Exception as e:
+        exit(f"An unexpected error occurred: {e}")
+
+def move_file(current_location: Path, new_location: str) -> None:
+    """
+    Moves a file from the current location to the new location
+
+    Args:
+        current_location (str): The current file path.
+        new_location (str): The new file path, including the new name.
+    """
+    # Validate current file exists
+    if not os.path.isfile(current_location):
+        raise FileNotFoundError(f"The file '{current_location}' does not exist.")
+
+    # Move the file
+    shutil.move(current_location, new_location)
+    logging.info(f"""File moved successfully: "{new_location}" """)
+
+def update_key_in_place(d, old_key, new_key, new_value):
+    """
+    Updates a dictionary by replacing a specific key-value pair with a new key-value
+    pair in-place while maintaining the order of elements. This function does not
+    modify the original dictionary directly but constructs a new dictionary with
+    the updated key-value pair and returns it.
+
+    :param d: Dictionary in which the key-value pair will be updated
+    :type d: dict
+    :param old_key: Key to be replaced in the dictionary
+    :type old_key: Any
+    :param new_key: New key to replace the old one
+    :type new_key: Any
+    :param new_value: New value to associate with the new key
+    :type new_value: Any
+    :return: A new dictionary with the updated key-value pair
+    :rtype: dict
+    """
+    items = list(d.items())  # Get the list of key-value pairs
+    for i, (key, value) in enumerate(items):
+        if key == old_key:
+            items[i] = (new_key, new_value)  # Replace the key-value pair
+            break
+    return dict(items)
+
+def text_to_filename(text: str) -> str:
+    """
+    Converts a given line of text into a filename-friendly format.
+
+    - Only alphanumeric characters are kept.
+    - Spaces are replaced with underscores.
+    - Non-alphanumeric characters are removed.
+
+    Args:
+        text (str): The input line of text.
+
+    Returns:
+        str: A string formatted as a valid filename.
+    """
+    # Replace spaces with underscores
+    text = text.replace(" ", "_")
+
+    # Remove non-alphanumeric characters except underscores
+    text = re.sub(r"[^a-zA-Z0-9_]", "", text)
+
+    return text
+
+def get_custom_instructions(config_data: dict):
+    """
+    Generate custom instructions for resume creation based on the provided configuration data.
+
+    This function interprets the configuration data and constructs tailored instructions
+    that can be used to modify or review a resume according to the specified requirements.
+    Key aspects like word count guidance for job experience and preferences for resume
+    page length are taken into consideration.
+
+    :param config_data: Contains configuration data with keys that specify resume requirements
+      including desired word count and page preferences
+    :type config_data: dict
+
+    :return: A string containing the generated custom instructions based on the given configuration data
+    :rtype: str
+    """
+    custom_instructions = ""
+
+    if config_data.get('target_highlights_length_words', 0) > 0:
+        custom_instructions += f"The text for each job in the experience section should have approximately {config_data.get('target_highlights_length_words')} words.\n"
+
+    if config_data.get('multiple_pages', False):
+        custom_instructions += "It is fine if the resume spans multiple pages, as long as the quality of the resume matches the job description.\n"
+    else:
+        custom_instructions += "Try to keep the experience section concise so the resume fits into a single page.\n"
+
+    return custom_instructions
+
+def display_matching_scores(response):
+    """
+    Displays a comparison of matching scores between an old and a new resume,
+    along with an analysis message. Outputs a formatted table displaying the scores,
+    and an analysis panel with the provided description.
+
+    :param response: A dictionary containing the matching scores and analysis description.
+                     Expected keys:
+                       - 'old_resume_match_score' (float): The match score for the old resume (0 to 1).
+                       - 'new_resume_match_score' (float): The match score for the new resume (0 to 1).
+                       - 'description' (str): An analysis text or description to explain the scores.
+    :return: None
+    """
+    console = Console()
+
+    # Create score comparison table
+    score_table = Table(
+        title="Resume Match Comparison",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan"
+    )
+
+    score_table.add_column("Resume Version", style="cyan")
+    score_table.add_column("Match Score", style="magenta")
+
+    # Add rows with percentage formatting
+    score_table.add_row(
+        "Old Resume",
+        f"{response['old_resume_match_score'] * 100:.1f}%"
+    )
+    score_table.add_row(
+        "New Resume",
+        f"{response['new_resume_match_score'] * 100:.1f}%"
+    )
+
+    # Create analysis panel
+    analysis_panel = Panel(
+        response['description'],
+        title="[bold yellow]Analysis",
+        border_style="yellow",
+        padding=(1, 2)
+    )
+
+    # Print everything with some spacing
+    console.print("\n")
+    console.print(score_table, justify="center")
+    console.print("\n")
+    console.print(analysis_panel)
+    console.print("\n")

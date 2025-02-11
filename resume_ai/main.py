@@ -74,7 +74,7 @@ def main() -> None:
         )
 
     # Load the old resume
-    current_resume = load_pdf(RESUMES_OLD_DIR_PATH / CONFIG_DATA.get("resume_old_name"))
+    current_resume = load_pdf(RESUMES_OLD_DIR_PATH / CONFIG_DATA.get("current_resume_name"))
 
     # Set up an LLM client
     llm_client = OpenAIClient()

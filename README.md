@@ -30,7 +30,7 @@ ResumeAI is an intelligent resume creation tool that leverages Large Language Mo
 ```json
 {
   "name": "Your Name",
-  "resume_old_name": "your-current-resume.pdf",
+  "current_resume_name": "your-current-resume.pdf",
   "mode": "files",  // or "links"
   "theme": "chosen-theme",
   "target_highlights_length_words": 50,  // optional

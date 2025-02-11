@@ -1,0 +1,24 @@
+As a Salesforce Engineer, you’ll be responsible for developing and improving our Salesforce platform, supporting seamless integrations, and enhancing system performance.
+
+
+
+Key Responsibilities
+
+Develop Solutions: Translate business needs into scalable Salesforce solutions.
+Collaborate: Work closely with the team to support development efforts and share knowledge.
+Improve Code: Optimize the existing codebase and build new features.
+Manage Synchronization: Maintain and develop our two-way sync with core systems.
+Troubleshoot: Identify and resolve technical issues, ensuring data integrity.
+Stay Updated: Keep up with the latest Salesforce features and updates.
+
+
+Your Profile
+
+5+ years of Salesforce development experience.
+Expertise in Apex, Visualforce, Aura, LWC, JavaScript, HTML5, CSS.
+Strong skills in SOQL, SQL, and relational databases.
+Knowledge of event-driven architecture.
+Experience with Salesforce Flows, Metadata, and APIs.
+Familiar with Scrum and release management.
+Fluent in English (C1); German is a plus.
+Salesforce certifications are beneficial.

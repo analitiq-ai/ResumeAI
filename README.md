@@ -26,6 +26,9 @@ ResumeAI is an intelligent resume creation tool that leverages Large Language Mo
  - operating mode
  - your theme. Check out themes here: https://github.com/rendercv/rendercv/tree/main/examples
 
+Watch the video bellow for a quick guide:
+[![How to use ResumeAI to create 000s of resumes](media/create 100 resumes with AI.png)](https://www.loom.com/share/0ad82822f89b45f9b5fa449fcea24618?sid=7588bde7-9772-4779-89ed-c7903273ceb9)
+
 2. Configure your setup in `config.json`:
 ```json
 {

@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 from langchain_community.document_loaders import PyPDFLoader
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 from rich import box
 

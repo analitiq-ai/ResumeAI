@@ -116,7 +116,7 @@ class JobManager:
             },
         )
 
-        response = self.llm_client.invoke_llm(prompt, job_description, parser)
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
         display_resumes_to_job_matching_scores(response)
 
 
@@ -147,7 +147,7 @@ class JobManager:
         logging.info(f""" {"="*20} Creating resume for job: %s {"="*20} """, job_title)
         job_file_name_without_extension = text_to_filename(job_title)
 
-        response = self.llm_client.invoke_llm(prompt, job_description, parser)
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
 
         # LLM has a tendency to add empty items, like `extracurricular_activities: []`. We should remove them as rendercv throws an error.
         new_cv_dict = clean_empty(response["cv"])

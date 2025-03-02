@@ -44,10 +44,10 @@ Watch the video bellow for a quick guide:
 {
   "name": "Your Name",
   "current_resume_name": "your-current-resume.pdf",
-  "mode": "files",  // or "links"
+  "mode": "files",
   "theme": "chosen-theme",
-  "target_highlights_length_words": 50,  // optional
-  "wordai_api_key": "",  // optional
+  "target_highlights_length_words": 50,
+  "wordai_api_key": "",
   "multiple_pages": false,
   "write_cover_letter": false,
   "match_job_to_user_pref": true

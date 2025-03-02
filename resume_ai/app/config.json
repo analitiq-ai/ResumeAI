@@ -8,5 +8,5 @@
   "multiple_pages": true,
   "write_cover_letter": true,
   "match_job_to_user_pref": true,
-  "match_job_to_user_pref_limit": 0.5
+  "match_job_to_user_pref_limit": 0.1
 }

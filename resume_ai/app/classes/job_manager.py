@@ -119,6 +119,12 @@ class JobManager:
         response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
         display_resumes_to_job_matching_scores(response)
 
+    @staticmethod
+    def get_job_dir(job_title):
+        return text_to_filename(job_title)
+
+    def get_output_folder_name(self, job_title):
+        return f"rendercv_output/{self.get_job_dir(job_title)}"
 
     def create_resume(
             self,
@@ -145,7 +151,8 @@ class JobManager:
         )
 
         logging.info(f""" {"="*20} Creating resume for job: %s {"="*20} """, job_title)
-        job_file_name_without_extension = text_to_filename(job_title)
+        job_file_name_without_extension = self.get_job_dir(job_title)
+        output_folder_name = self.get_output_folder_name(job_title)
 
         response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
 
@@ -169,7 +176,7 @@ class JobManager:
         # Attempt to render the new resume
         render_cmd = (
             f'rendercv render "{job_descr_resume_filename}" '
-            f'--output-folder-name "rendercv_output/{job_file_name_without_extension}"'
+            f'--output-folder-name "{output_folder_name}"'
         )
         logging.info("Running command: %s", render_cmd)
 

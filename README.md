@@ -1,15 +1,17 @@
 # ResumeAI
 
-ResumeAI is a job application tool for lazy people. 
+ResumeAI is a job application tool for lazy people. Generate custom resumes/CVs for the jobs you like autmagically using AI while you sleep.
 
 ResumeAI will take your current resume and use it to create a tailored resume and cover letter for a job you want to apply for using Large Language Models (LLMs). And it will do that for 000s of jobs of your preference while you sleep. 
 
 It works as a wrapper for [rendercv](https://github.com/rendercv/rendercv), enhancing its capabilities with AI-powered resume creation.
 
 You can see right away that a **tailored resume** give you better chance to get the job:
+
 ![Alt text](media/resumeai.png "ResumeAI")
 
 Skip the jobs that are **not a good match for you:**
+
 ![Alt text](media/job-req-match.png "ResumeAI")
 
 ## Key Features

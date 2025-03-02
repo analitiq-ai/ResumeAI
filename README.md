@@ -67,13 +67,6 @@ Watch the video bellow for a quick guide:
 - **match_job_to_user_pref**: If you had filled in your job preferences in `user_data.py`, AI will tell you how well the job matches to your requirements.
 - **match_job_to_user_pref_limit**: Skip the jobs that do not meet your standards. Put a decimal as a percentage (0.8 = 80%)
 
-## Skipping jobs that are not a good match
-If you do not want to apply for jobs that are an obvious bad match (example, you want part-time and the job offers full-time only), you can enable that in config parameters. So, resumes will be created only for the jobs, whose description matches at least X% of your requirements. 
-1. Write your requirements in `resume_ai/app/user_data/user_data_TEMPLATE.py`
-2. rename it to `resume_ai/app/user_data/user_data.py`
-3. Set `match_job_to_user_pref` in config to 'true'
-4. Set % match threshold for `match_job_to_user_pref_limit` in config to a float (ex: 0.85 = 85%)
-
 ## Usage
 
 1. Place your current resume(s) in `user_data/resumes_old/`
@@ -95,6 +88,17 @@ If you do not want to apply for jobs that are an obvious bad match (example, you
 - **Custom Instructions**: Ability to specify length and format preferences
 - **Automatic File Management**: Processed job descriptions are automatically organized
 - **PDF Generation**: Automatic conversion of YAML to professionally formatted PDF resumes
+
+### Skipping jobs that are not a good match
+If you do not want to apply for jobs that are an obvious bad match (example, you want part-time and the job offers full-time only), you can enable that in config parameters. So, resumes will be created only for the jobs, whose description matches at least X% of your requirements.
+1. Write your requirements in `resume_ai/app/user_data/user_data_TEMPLATE.py`
+2. rename it to `resume_ai/app/user_data/user_data.py`
+3. Set `match_job_to_user_pref` in config to 'true'
+4. Set % match threshold for `match_job_to_user_pref_limit` in config to a float (ex: 0.85 = 85%)
+
+### Avoiding AI Detectors
+You can use additional plugins to ensure your newly created resume does not get flagged by AI detectors, often employed by recruiters to screen resumes.
+![Alt text](media/ai_detection.png "ResumeAI")
 
 ## Notes
 

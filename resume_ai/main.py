@@ -6,7 +6,7 @@ from langchain.globals import set_verbose
 
 # Local imports
 from resume_ai.app.clients.openai_client import OpenAIClient
-from resume_ai.app.classes.resume_creator import ResumeCreator
+from resume_ai.app.classes.resume_creator import JobManager
 from resume_ai.app.classes.cover_letter_creator import CoverLetterCreator
 from resume_ai.app.funcs import (
     load_yaml,
@@ -81,7 +81,7 @@ def main() -> None:
     logger.info("Running in '%s' mode.", CONFIG_DATA.get("mode"))
 
     # Create class instances
-    resume_creator = ResumeCreator(
+    resume_creator = JobManager(
         llm_client=llm_client,
         current_resume=current_resume,
         example_yaml=example_yaml,

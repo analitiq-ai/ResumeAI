@@ -1,11 +1,12 @@
 # ResumeAI
 
-ResumeAI is an intelligent resume creation tool that leverages Large Language Models (LLMs) to automatically generate 000s of tailored resumes and cover letters for specific job descriptions. It works as a wrapper for [rendercv](https://github.com/rendercv/rendercv), enhancing its capabilities with AI-powered content generation.
+ResumeAI is a job application tool for lazy people. It leverages Large Language Models (LLMs) to automatically generate 000s of tailored resumes and cover letters for specific job descriptions. It works as a wrapper for [rendercv](https://github.com/rendercv/rendercv), enhancing its capabilities with AI-powered content generation.
 
 ![Alt text](media/resumeai.png "ResumeAI")
 
 ## Key Features
 
+- **Job Matching to You**: Use AI to check how well the job description matches your personality and your job requirements.
 - **AI-Powered Resume Generation**: Automatically creates tailored resumes for specific job descriptions using LLMs of your choice (Bedrock and OpenAI are supported)
 - **Smart Resume Matching**: Compares both your current and newly generated resume against job requirements with detailed scoring
 - **Multiple Input Methods**: Process job descriptions from:
@@ -40,7 +41,8 @@ Watch the video bellow for a quick guide:
   "target_highlights_length_words": 50,  // optional
   "wordai_api_key": "",  // optional
   "multiple_pages": false,
-  "write_cover_letter": false
+  "write_cover_letter": false,
+  "match_job_to_user_pref": true
 }
 ```
 
@@ -54,6 +56,7 @@ Watch the video bellow for a quick guide:
 - **wordai_api_key**: Optional API key for WordAI integration to avoid AI detection
 - **multiple_pages**: Allow resume to span multiple pages if needed
 - **write_cover_letter**: Enable automatic cover letter generation
+- **match_job_to_user_pref**: If you had filled in your job preferences in `user_data.py`, AI will tell you how well the job matches to your requirements.
 
 ## Usage
 

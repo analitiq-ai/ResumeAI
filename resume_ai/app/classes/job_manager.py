@@ -25,7 +25,7 @@ from resume_ai.app.models import CVRoot, JobMatchScore
 
 
 
-class ResumeCreator:
+class JobManager:
     """
     A class responsible for creating resumes based on job descriptions
     and matching them to existing resumes.
@@ -80,6 +80,8 @@ class ResumeCreator:
 
         response = self.llm_client.invoke_llm(prompt, job_description, parser)
         display_matching_scores(response)
+
+
 
     def create_resume(
             self,

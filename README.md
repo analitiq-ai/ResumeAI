@@ -1,22 +1,28 @@
 # ResumeAI
 
-ResumeAI is a job application tool for lazy people. It leverages Large Language Models (LLMs) to automatically generate 000s of tailored resumes and cover letters for specific job descriptions. It works as a wrapper for [rendercv](https://github.com/rendercv/rendercv), enhancing its capabilities with AI-powered content generation.
+ResumeAI is a job application tool for lazy people. 
 
+ResumeAI will take your current resume and use it to create a tailored resume and cover letter for a job you want to apply for using Large Language Models (LLMs). And it will do that for 000s of jobs of your preference while you sleep. 
+
+It works as a wrapper for [rendercv](https://github.com/rendercv/rendercv), enhancing its capabilities with AI-powered resume creation.
+
+You can see right away that a **tailored resume** give you better chance to get the job:
 ![Alt text](media/resumeai.png "ResumeAI")
+
+Skip the jobs that are **not a good match for you:**
+![Alt text](media/job-req-match.png "ResumeAI")
 
 ## Key Features
 
-- **Job Matching to You**: Use AI to check how well the job description matches your personality and your job requirements.
+- **Job Matching to Your Preferences**: Use AI to check how well the job description matches your personality and your job requirements.
 - **AI-Powered Resume Generation**: Automatically creates tailored resumes for specific job descriptions using LLMs of your choice (Bedrock and OpenAI are supported)
-- **Smart Resume Matching**: Compares both your current and newly generated resume against job requirements with detailed scoring
-- **Multiple Input Methods**: Process job descriptions from:
+- **Old vs New Resume Comparison**: Compares both your current and newly generated resume against job requirements with detailed scoring
+- **Multiple way to add Job Description**: Process job descriptions from:
     - Text files (.txt)
     - Online job postings (via URLs)
 - **Cover Letter Generation**: Optional automated creation of personalized cover letters
 - **AI Detection Avoidance**: Integration with WordAI for content rewriting (optional) to avoid AI detection tools
 - **Visual Match Scoring**: Clear visual representation of how well your resumes match job requirements
-- **Multiple Output Formats**: Generates both YAML and PDF versions of your resume
-
 
 # Quickstart
 1. run poetry install to set up dependencies

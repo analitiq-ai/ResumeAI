@@ -6,7 +6,7 @@ from langchain.globals import set_verbose
 
 # Local imports
 from resume_ai.app.clients.openai_client import OpenAIClient
-from resume_ai.app.classes.resume_creator import JobManager
+from resume_ai.app.classes.job_manager import JobManager
 from resume_ai.app.classes.cover_letter_creator import CoverLetterCreator
 from resume_ai.app.funcs import (
     load_yaml,
@@ -81,7 +81,7 @@ def main() -> None:
     logger.info("Running in '%s' mode.", CONFIG_DATA.get("mode"))
 
     # Create class instances
-    resume_creator = JobManager(
+    job_mgr = JobManager(
         llm_client=llm_client,
         current_resume=current_resume,
         example_yaml=example_yaml,
@@ -100,19 +100,28 @@ def main() -> None:
 
         for job_data in job_descriptions:
             job_title = os.path.splitext(job_data['file_name'])[0]
-            content = job_data['content']
+            job_description = job_data['content']
 
-            success, new_resume = resume_creator.create_resume(job_title, content)
+            # if user wants to match job to their requirements, do that first
+            if CONFIG_DATA.get("match_job_to_user_pref"):
+                logger.info("Matching job to user preferences")
+                score = job_mgr.match_job_to_req(job_title, job_description)
+                if score < CONFIG_DATA.get("match_job_to_user_pref_limit", 0):
+                    logger.info("Job does not offer a good enough match to user preferences. Skipping job.")
+                    continue
+
+            success, new_resume = job_mgr.create_resume(job_title, job_description)
             if success:
+
+                # Optionally write a cover letter
+                if CONFIG_DATA.get("write_cover_letter", False):
+                    cover_letter_creator.create_cover_letter(job_title, job_description, new_resume)
+
                 # Move the processed job file
                 move_file(
                     JOB_DESCRIPTION_DIR_PATH / job_data['file_name'],
                     JOB_DESCRIPTION_PROCESSED_DIR_PATH / job_data['file_name']
                 )
-
-                # Optionally write a cover letter
-                if CONFIG_DATA.get("write_cover_letter", False):
-                    cover_letter_creator.create_cover_letter(job_title, content, new_resume)
 
     elif CONFIG_DATA.get("mode") == 'links':
         links = load_json(JOB_DESCRIPTION_DIR_PATH / "job_links.json")
@@ -125,7 +134,15 @@ def main() -> None:
             job_title = job.metadata.get("title", "No Title Found")
             job_description = job.page_content
 
-            success, new_resume = resume_creator.create_resume(job_title, job_description)
+            # if user wants to match job to their requirements, do that first
+            if CONFIG_DATA.get("match_job_to_user_pref"):
+                logger.info("Matching job to user preferences")
+                score = job_mgr.match_job_to_req(job_title, job_description)
+                if score < CONFIG_DATA.get("match_job_to_user_pref_limit", 0):
+                    logger.info("Job does not offer a good enough match to user preferences. Skipping job.")
+                    continue
+
+            success, new_resume = job_mgr.create_resume(job_title, job_description)
             if success and CONFIG_DATA.get("write_cover_letter", False):
                 cover_letter_creator.create_cover_letter(job_title, job_description, new_resume)
 

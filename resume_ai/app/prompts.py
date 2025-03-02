@@ -1,5 +1,5 @@
 RESUME_TO_JOB_PROMPT = """
-I would like you to adapt my resume to a job description.
+I would like you to adapt my resume to a job description for a job: {job_title}.
 You can only re-use the elements that exist in my current resume.
 Do not invent skills or knowledge that is not strongly implied from my current resume.
 {custom_instructions}
@@ -11,7 +11,7 @@ Do not invent skills or knowledge that is not strongly implied from my current r
 
 ## Job Description:
 ```
-{job}
+{job_description}
 ```
 Your response should be my new resume, adapted to match the job description provided back to me as per format instructions.
 It is important to stick with the same structure of each attribute as in the example.
@@ -47,7 +47,7 @@ Add 2 new line breaks between paragraphs
 ```
 """
 
-MATCH_RESUMES_PROMPTS = """
+MATCH_RESUMES_PROMPT = """
 You are a recruiter who is hiring for a job: {job_title}.
 I would like you to critically examine my current resume and the new resume I have created specifically for this job.
 Compare each resume to the job description and provide me back score for each on how well it matches the job description.
@@ -65,7 +65,32 @@ Your response must adhere to the format stated below in the section "Format inst
 
 ## Job Description:
 ```
-{job}
+{job_description}
+```
+
+## Format instructions:
+{format_instructions}
+"""
+
+MATCH_USER_REQ_PROMPT = """
+You are a recruiter who is hiring for a job: {job_title}.
+I would like you to critically examine my current resume and the new resume I have created specifically for this job.
+Compare each resume to the job description and provide me back score for each on how well it matches the job description.
+Your response must adhere to the format stated below in the section "Format instructions".
+
+## User Description:
+```
+{user_descr}
+```
+
+## User Job Requirements:
+```
+{user_job_req}
+```
+
+## Job Description:
+```
+{job_description}
 ```
 
 ## Format instructions:

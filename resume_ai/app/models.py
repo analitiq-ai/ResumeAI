@@ -63,7 +63,12 @@ class Resume(BaseModel):
 class CVRoot(BaseModel):
     cv: Resume
 
-class JobMatchScore(BaseModel):
+class ResumeJobMatchScore(BaseModel):
     old_resume_match_score: float = Field(..., description="Score indicating how well the old resume matches the job description, ranging from 0 to 1 as a float.")
     new_resume_match_score: float = Field(..., description="Score indicating how well the new resume matches the job description, ranging from 0 to 1 as a float.")
     description: float = Field(..., description="Add here any evaluation text that you feel is important.")
+
+class UserJobMatchScore(BaseModel):
+    job_positives: str = Field(..., description="Short list of job parameters that explicitly match users requirements.")
+    job_negatives: str = Field(..., description="Short list of job parameters that explicitly do not match users requirements.")
+    job_to_req_match_score: float = Field(..., description="Score indicating how well the job matches the user requirements, ranging from 0 to 1 as a float.")

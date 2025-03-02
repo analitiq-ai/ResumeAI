@@ -299,7 +299,51 @@ def get_custom_instructions(config_data: dict):
 
     return custom_instructions
 
-def display_matching_scores(response):
+def display_job_to_user_req_matching_scores(response):
+    """
+    Displays a comparison of matching scores between a job and user requirements,
+    along with an analysis message of positives and negatives. Outputs a formatted table displaying the score,
+    and an analysis panel of positives and negatives for each job
+
+    :param response: A dictionary containing the matching scores and analysis description.
+                     Expected keys:
+                       - 'old_resume_match_score' (float): The match score for the old resume (0 to 1).
+                       - 'new_resume_match_score' (float): The match score for the new resume (0 to 1).
+                       - 'description' (str): An analysis text or description to explain the scores.
+    :return: None
+    """
+    console = Console()
+
+    # Create score comparison table
+    score_table = Table(
+        title="Job to User Requirements Match Comparison",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan"
+    )
+
+    score_table.add_column("Parameter", style="cyan")
+    score_table.add_column("Value or Descr", style="magenta")
+
+    # Add rows with percentage formatting
+    score_table.add_row(
+        "Job Match to User Requirements (Score)",
+        f"{response['job_to_req_match_score'] * 100:.1f}%\n"
+    )
+
+    score_table.add_row(
+        "Job Positives",
+        f"{response['job_positives']}\n"
+    )
+    score_table.add_row(
+        "Job Negatives",
+        f"{response['job_negatives']}"
+    )
+
+    # Print everything with some spacing
+    console.print(score_table, justify="left")
+
+def display_resumes_to_job_matching_scores(response):
     """
     Displays a comparison of matching scores between an old and a new resume,
     along with an analysis message. Outputs a formatted table displaying the scores,
@@ -316,38 +360,33 @@ def display_matching_scores(response):
 
     # Create score comparison table
     score_table = Table(
-        title="Resume Match Comparison",
+        title="Resumes to Job Match Comparison",
         box=box.ROUNDED,
         show_header=True,
         header_style="bold cyan"
     )
 
-    score_table.add_column("Resume Version", style="cyan")
-    score_table.add_column("Match Score", style="magenta")
+    score_table.add_column("Parameter", style="cyan")
+    score_table.add_column("Value or Description", style="magenta")
 
     # Add rows with percentage formatting
     score_table.add_row(
-        "Old Resume",
-        f"{response['old_resume_match_score'] * 100:.1f}%"
+        "Old Resume Match Score",
+        f"{response['old_resume_match_score'] * 100:.1f}%\n"
     )
     score_table.add_row(
-        "New Resume",
-        f"{response['new_resume_match_score'] * 100:.1f}%"
+        "New Resume Match Score",
+        f"{response['new_resume_match_score'] * 100:.1f}%\n"
     )
 
-    # Create analysis panel
-    analysis_panel = Panel(
-        response['description'],
-        title="[bold yellow]Analysis",
-        border_style="yellow",
-        padding=(1, 2)
+    score_table.add_row(
+        "Analysis",
+        f"{response['description']}"
     )
 
     # Print everything with some spacing
     console.print("\n")
-    console.print(score_table, justify="center")
-    console.print("\n")
-    console.print(analysis_panel)
+    console.print(score_table, justify="left")
     console.print("\n")
 
 def clean_empty(d):

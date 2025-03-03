@@ -27,13 +27,14 @@ Skip the jobs that are **not a good match for you:**
 - **Visual Match Scoring**: Clear visual representation of how well your resumes match job requirements
 
 # Quickstart
-1. run poetry install to set up dependencies
-2. put your old CVs into `app/user_data/resumes` directory
+1. run `poetry install` to set up dependencies
+2. put your old CVs into **resume_ai/app/user_data/resumes** directory
 3. update config.json with:
- - the path to your old CV
  - your name
- - operating mode
- - your theme. Check out themes here: https://github.com/rendercv/rendercv/tree/main/examples
+ - the path to your old CV
+ - operating mode (files or links)
+ - your theme. Default is `engineeringresumes` Check out themes here: https://github.com/rendercv/rendercv/tree/main/examples
+ - your job preferences in file `resume_ai/app/user_data/user_data.py`
 
 Watch the video bellow for a quick guide:
 

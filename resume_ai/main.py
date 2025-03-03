@@ -14,14 +14,16 @@ from resume_ai.app.funcs import (
     load_pdf,
     load_json,
     load_txt_files_from_directory,
-    move_file,
+    move_processed_job,
     run_shell_cmd,
-    update_key_in_place
+    update_key_in_place,
+    filter_unprocessed_jobs,
+    load_jobs_processed_urls
 )
 from resume_ai.app.constants import (
     JOB_DESCRIPTION_DIR_PATH,
-    JOB_DESCRIPTION_PROCESSED_DIR_PATH,
-    RESUMES_OLD_DIR_PATH
+    RESUMES_OLD_DIR_PATH,
+    JOBS_FILE,
 )
 
 
@@ -58,7 +60,7 @@ def write_output(msg: str):
     with open(output_file, "a") as f:
         f.write(msg + "\n")
 
-def process_job(job_mgr: JobManager, job_title: str, job_description: str, cover_letter_creator: CoverLetterCreator, file_name=None):
+def process_job(job_mgr: JobManager, job_title: str, job_description: str, cover_letter_creator: CoverLetterCreator):
 
     """Processes a job by matching it to user preferences, creating a resume, and optionally a cover letter."""
     if CONFIG_DATA.get("match_job_to_user_pref"):
@@ -90,12 +92,7 @@ def process_job(job_mgr: JobManager, job_title: str, job_description: str, cover
         if CONFIG_DATA.get("write_cover_letter", False):
             cover_letter_creator.create_cover_letter(job_title, job_description, new_resume, output_folder_name)
 
-        # Move the processed file if applicable
-        if file_name:
-            move_file(
-                JOB_DESCRIPTION_DIR_PATH / file_name,
-                JOB_DESCRIPTION_PROCESSED_DIR_PATH / file_name
-            )
+    return success
 
 def main() -> None:
     """
@@ -159,23 +156,47 @@ def main() -> None:
             job_description = job_data['content']
             write_output(f"""## Title: {job_title}""")
 
-            process_job(job_mgr, job_title, job_description, cover_letter_creator, job_data['file_name'])
+            success = process_job(job_mgr, job_title, job_description, cover_letter_creator)
+
+            # Move the processed file if applicable
+            if success:
+                move_processed_job(CONFIG_DATA.get("mode"), job_data['file_name'])
 
     elif CONFIG_DATA.get("mode") == 'links':
-        links = load_json(JOB_DESCRIPTION_DIR_PATH / "job_links.json")
+        links = load_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE)
+        unique_links = list(set(links))
+
+        jobs_processed = load_jobs_processed_urls()
+
+        # Filter unprocessed jobs
+        unprocessed_unique_links = filter_unprocessed_jobs(unique_links, jobs_processed)
+
+        if not unprocessed_unique_links:
+            logger.error("No unprocessed jobs found.")
+            raise SystemExit(1)
+
+        # If useragent is not set, set it
+        user_agent = os.environ.get('USER_AGENT', None)
+        if not user_agent:
+            os.environ['USER_AGENT'] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
         from resume_ai.app.classes.url_crawler import URLCrawler
         crawler = URLCrawler(llm_client)
-        crawled_descriptions = crawler.crawl_urls(links)
+        crawled_descriptions = crawler.crawl_urls(unprocessed_unique_links)
 
         for job in crawled_descriptions:
+            job_link = job.metadata.get("source")
             job_title = job.metadata.get("title", "No Title Found")
             write_output(f"""## Title: {job_title}""")
-            write_output(f""" - [{job.metadata.get("source")}]({job.metadata.get("source")})""")
+            write_output(f""" - [{job_link}]({job_link})""")
 
             job_description = job.page_content
 
-            process_job(job_mgr, job_title, job_description, cover_letter_creator)
+            success = process_job(job_mgr, job_title, job_description, cover_letter_creator)
+
+            # Move the processed job link
+            if success:
+                move_processed_job(CONFIG_DATA.get("mode"), job_link)
 
     print(f"Output saved to {output_file}")
 

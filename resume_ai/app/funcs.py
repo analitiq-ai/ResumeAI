@@ -10,6 +10,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from rich.console import Console
 from rich.table import Table
 from rich import box
+from resume_ai.app.constants import JOBS_FILE, JOBS_PROCESSED_FILE, JOB_DESCRIPTION_DIR_PATH, JOB_DESCRIPTION_PROCESSED_DIR_PATH
 
 def extract_yaml_from_string(input_string):
     """
@@ -199,8 +200,8 @@ def load_json(file_path):
 
         return config_data
 
-    except FileNotFoundError:
-        exit(f"File not found at path: {file_path}")
+    except FileNotFoundError as e:
+        raise e
 
     except json.JSONDecodeError:
         exit("Error decoding file. Ensure it is properly formatted JSON.")
@@ -208,21 +209,64 @@ def load_json(file_path):
     except Exception as e:
         exit(f"An unexpected error occurred: {e}")
 
-def move_file(current_location: Path, new_location: str) -> None:
+def save_json(filename, data):
+    """Saves JSON data to a file."""
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=2)
+
+def move_processed_job_file(filename: str) -> None:
     """
     Moves a file from the current location to the new location
 
     Args:
-        current_location (str): The current file path.
-        new_location (str): The new file path, including the new name.
+        filename (str): filename to move.
     """
     # Validate current file exists
+    current_location = JOB_DESCRIPTION_DIR_PATH / filename
+    new_location = JOB_DESCRIPTION_PROCESSED_DIR_PATH / filename
+
     if not os.path.isfile(current_location):
         raise FileNotFoundError(f"The file '{current_location}' does not exist.")
 
     # Move the file
     shutil.move(current_location, new_location)
     logging.info(f"""File moved successfully: "{new_location}" """)
+
+def load_jobs_processed_urls():
+    "Loads the list of processed job URLs. If the file does not exist, it will return an empty list."
+    try:
+        jobs_processed = load_json(JOB_DESCRIPTION_PROCESSED_DIR_PATH /JOBS_PROCESSED_FILE)
+    except FileNotFoundError:
+        logging.info(f"Processed job file not found: {JOBS_PROCESSED_FILE}")
+        jobs_processed = []
+    return jobs_processed
+
+def move_processed_job_url(job_url):
+    """Moves a processed job from jobs.json to jobs_processed.json."""
+    jobs = load_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE)
+
+    jobs_processed = load_jobs_processed_urls()
+
+    if job_url in jobs:
+        jobs.remove(job_url)
+        jobs_processed.append(job_url)
+
+        save_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE, jobs)
+        save_json(JOB_DESCRIPTION_PROCESSED_DIR_PATH / JOBS_PROCESSED_FILE, jobs_processed)
+        logging.info(f"Moved url for job to processed: {job_url}")
+    else:
+        logging.error(f"Job not found in {JOBS_FILE}")
+
+def move_processed_job(mode: str, item: str):
+    """Moves a processed job that is either a URL or a file path"""
+    if mode == "links":
+        move_processed_job_url(item)
+    elif mode == "files":
+        move_processed_job_file(item)
+
+def filter_unprocessed_jobs(jobs, jobs_processed):
+    """Returns a list of jobs that have not been processed."""
+    return [job for job in jobs if job not in jobs_processed]
 
 def update_key_in_place(d, old_key, new_key, new_value):
     """

@@ -44,7 +44,7 @@ class ExtracurricularActivity(BaseModel):
     bullet: str
 
 class ResumeSections(BaseModel):
-    summary: List[str] = Field(..., description="Always put above other properties in the respective section.")
+    summary: List[str]
     education: List[EducationEntry]
     experience: List[ExperienceEntry]
     projects: List[ProjectEntry]

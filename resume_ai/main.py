@@ -119,8 +119,8 @@ def main() -> None:
         example_yaml['cv']['sections'] = update_key_in_place(
             cv_sections,
             'welcome_to_RenderCV!',
-            'Summary',
-            ['This is the summary of the profile as it relates to the job.']
+            'summary',
+            ['Hard working and experienced professional with a strong background in productive collaboration and teamwork.']
         )
         logger.debug(
             "Replaced 'welcome_to_RenderCV!' with 'Summary' in %s", yaml_template_cv

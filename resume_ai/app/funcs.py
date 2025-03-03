@@ -46,9 +46,10 @@ def save_yaml_to_file(data, filename):
         data (dict): The data to save.
         filename (str): The file path where the YAML content will be saved.
     """
+
     try:
         with open(filename, 'w') as file:
-            yaml.dump(data, file, default_flow_style=False)
+            yaml.dump(data, file, default_flow_style=False, sort_keys=False) # By default, yaml.dump() attempts to sort dictionary keys alphabetically, unless explicitly configured otherwise.
         logging.debug(f"YAML saved successfully to {filename}")
     except Exception as e:
         logging.error("Error saving YAML to file:", e)

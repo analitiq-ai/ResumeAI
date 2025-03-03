@@ -18,6 +18,7 @@ It is important to stick with the same structure of each attribute as in the exa
 You can omit any attributes that are not applicable to my resume from your response.
 Use example as a guide for resume structure. 
 You can update the content of any attribute but you cannot change the structure of the attributes.
+Make sure the properties in your response have the same order as in the example.
 ## Example:
 ```
 {example}

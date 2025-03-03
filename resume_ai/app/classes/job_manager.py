@@ -138,6 +138,7 @@ class JobManager:
         :param job_description: The job description text.
         :return: A tuple of (success_flag, new_resume_dict).
         """
+
         parser = JsonOutputParser(pydantic_object=CVRoot)
         prompt = PromptTemplate(
             template=RESUME_TO_JOB_PROMPT,

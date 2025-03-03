@@ -6,5 +6,7 @@
   "wordai_api_key": "",
   "target_highlights_length_words": 200,
   "multiple_pages": true,
-  "write_cover_letter": true
+  "write_cover_letter": true,
+  "match_job_to_user_pref": true,
+  "match_job_to_user_pref_limit": 0.1
 }

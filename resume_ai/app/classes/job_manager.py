@@ -8,24 +8,25 @@ from langchain.prompts import PromptTemplate
 from resume_ai.app.clients.openai_client import OpenAIClient
 from resume_ai.app.prompts import (
     RESUME_TO_JOB_PROMPT,
-    MATCH_RESUMES_PROMPTS
+    MATCH_RESUMES_PROMPT,
+    MATCH_USER_REQ_PROMPT
 )
 from resume_ai.app.funcs import (
     save_yaml_to_file,
     run_shell_cmd,
     text_to_filename,
     get_custom_instructions,
-    display_matching_scores,
+    display_resumes_to_job_matching_scores,
+    display_job_to_user_req_matching_scores,
     clean_empty
 )
 from resume_ai.app.constants import (
     RESUMES_NEW_YAML_DIR_PATH
 )
-from resume_ai.app.models import CVRoot, JobMatchScore
+from resume_ai.app.models import CVRoot, ResumeJobMatchScore, UserJobMatchScore
 
 
-
-class ResumeCreator:
+class JobManager:
     """
     A class responsible for creating resumes based on job descriptions
     and matching them to existing resumes.
@@ -51,6 +52,43 @@ class ResumeCreator:
         self.config_data = config_data
         self.user_name = user_name
 
+    def match_job_to_req(
+            self,
+            job_title: str,
+            job_description: str
+        ) -> float:
+        """
+        Matches a specific job to its corresponding requirements by utilizing
+        underlying matching algorithms or logic. This method performs the core
+        operation of linking or determining compatibility between job entities
+        and given requirement criteria from the user.
+
+        :return: Match result or status that indicates the relationship or compatibility
+                 between the job and its requirements.
+        :rtype: Any
+        """
+        logging.info("Matching user requirements job: %s", job_title)
+
+        # Importing optional components (this is not best practice)
+        from resume_ai.app.user_data.user_data import USER_DESCR, USER_JOB_REQ
+
+        parser = JsonOutputParser(pydantic_object=UserJobMatchScore)
+        prompt = PromptTemplate(
+            template=MATCH_USER_REQ_PROMPT,
+            input_variables=["job_title", "job_description"],
+            partial_variables={
+                "user_descr": USER_DESCR,
+                "user_job_req": USER_JOB_REQ,
+                "format_instructions": parser.get_format_instructions()
+            },
+        )
+
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        display_job_to_user_req_matching_scores(response)
+
+        return response['job_to_req_match_score']
+
+
     def match_resumes_to_job(
             self,
             job_title: str,
@@ -66,10 +104,10 @@ class ResumeCreator:
         :return: None
         """
         logging.info("Matching current resume and new resume for job: %s", job_title)
-        parser = JsonOutputParser(pydantic_object=JobMatchScore)
+        parser = JsonOutputParser(pydantic_object=ResumeJobMatchScore)
         prompt = PromptTemplate(
-            template=MATCH_RESUMES_PROMPTS,
-            input_variables=["job"],
+            template=MATCH_RESUMES_PROMPT,
+            input_variables=["job_title", "job_description"],
             partial_variables={
                 "current_resume": self.current_resume,
                 "new_resume": new_resume,
@@ -78,8 +116,15 @@ class ResumeCreator:
             },
         )
 
-        response = self.llm_client.invoke_llm(prompt, job_description, parser)
-        display_matching_scores(response)
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        display_resumes_to_job_matching_scores(response)
+
+    @staticmethod
+    def get_job_dir(job_title):
+        return text_to_filename(job_title)
+
+    def get_output_folder_name(self, job_title):
+        return f"rendercv_output/{self.get_job_dir(job_title)}"
 
     def create_resume(
             self,
@@ -96,7 +141,7 @@ class ResumeCreator:
         parser = JsonOutputParser(pydantic_object=CVRoot)
         prompt = PromptTemplate(
             template=RESUME_TO_JOB_PROMPT,
-            input_variables=["job"],
+            input_variables=["job_title", "job_description"],
             partial_variables={
                 "resume": self.current_resume,
                 "example": self.example_yaml.get('cv'),
@@ -106,9 +151,10 @@ class ResumeCreator:
         )
 
         logging.info(f""" {"="*20} Creating resume for job: %s {"="*20} """, job_title)
-        job_file_name_without_extension = text_to_filename(job_title)
+        job_file_name_without_extension = self.get_job_dir(job_title)
+        output_folder_name = self.get_output_folder_name(job_title)
 
-        response = self.llm_client.invoke_llm(prompt, job_description, parser)
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
 
         # LLM has a tendency to add empty items, like `extracurricular_activities: []`. We should remove them as rendercv throws an error.
         new_cv_dict = clean_empty(response["cv"])
@@ -130,7 +176,7 @@ class ResumeCreator:
         # Attempt to render the new resume
         render_cmd = (
             f'rendercv render "{job_descr_resume_filename}" '
-            f'--output-folder-name "rendercv_output/{job_file_name_without_extension}"'
+            f'--output-folder-name "{output_folder_name}"'
         )
         logging.info("Running command: %s", render_cmd)
 

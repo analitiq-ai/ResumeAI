@@ -309,6 +309,7 @@ def text_to_filename(text: str) -> str:
     """
     # Replace spaces with underscores
     text = text.replace(" ", "_")
+    text = text.replace("/", "_") # important for links
 
     # Remove non-alphanumeric characters except underscores
     text = re.sub(r"[^a-zA-Z0-9_]", "", text)

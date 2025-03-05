@@ -1,204 +1,183 @@
 import logging
-import os
-import datetime
 
 # Third-party imports
-from langchain.globals import set_verbose
+from langchain_core.output_parsers import JsonOutputParser
+from langchain.prompts import PromptTemplate
 
 # Local imports
 from resume_ai.app.clients.openai_client import OpenAIClient
-from resume_ai.app.classes.job_manager import JobManager
-from resume_ai.app.classes.cover_letter_creator import CoverLetterCreator
+from resume_ai.app.prompts import (
+    RESUME_TO_JOB_PROMPT,
+    MATCH_RESUMES_PROMPT,
+    MATCH_USER_REQ_PROMPT
+)
 from resume_ai.app.funcs import (
-    load_yaml,
-    load_pdf,
-    load_json,
-    load_txt_files_from_directory,
-    move_processed_job,
+    save_yaml_to_file,
     run_shell_cmd,
-    update_key_in_place,
-    filter_unprocessed_jobs,
-    load_jobs_processed_urls
+    get_job_dir,
+    get_custom_instructions,
+    display_resumes_to_job_matching_scores,
+    display_job_to_user_req_matching_scores,
+    clean_empty
 )
 from resume_ai.app.constants import (
-    JOB_DESCRIPTION_DIR_PATH,
-    RESUMES_OLD_DIR_PATH,
-    JOBS_FILE,
+    RESUMES_NEW_YAML_DIR_PATH
 )
+from resume_ai.app.models import CVRoot, ResumeJobMatchScore, UserJobMatchScore
 
 
-# ----------------------------------------------------------------------------------
-# Logging Setup
-# ----------------------------------------------------------------------------------
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-stream_handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
-
-# ----------------------------------------------------------------------------------
-# Global Settings
-# ----------------------------------------------------------------------------------
-set_verbose(False)
-
-# ----------------------------------------------------------------------------------
-# Load Config
-# ----------------------------------------------------------------------------------
-CONFIG_DATA = load_json("app/config.json")
-
-# ----------------------------------------------------------------------------------
-# Run output file
-# ----------------------------------------------------------------------------------
-# Generate timestamp
-timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
-# Output file name with timestamp
-output_file = f"run_{timestamp}.md"
-
-def write_output(msg: str):
-    with open(output_file, "a") as f:
-        f.write(msg + "\n")
-
-def process_job(job_mgr: JobManager, job_title: str, job_description: str, cover_letter_creator: CoverLetterCreator):
-
-    """Processes a job by matching it to user preferences, creating a resume, and optionally a cover letter."""
-    if CONFIG_DATA.get("match_job_to_user_pref"):
-        logger.info("Matching job to user preferences")
-        score = job_mgr.match_job_to_req(job_title, job_description)
-        write_output(f" - Job match score: {score}")
-
-        if score < CONFIG_DATA.get("match_job_to_user_pref_limit", 0):
-            msg = f""" - Job match score {score} is below threshold: {CONFIG_DATA.get("match_job_to_user_pref_limit", 0)}"""
-            logger.info(msg)
-            write_output(msg)
-            return
-
-    success = False
-
-    try:
-        success, new_resume = job_mgr.create_resume(job_title, job_description)
-    except Exception as e:
-        logger.exception("Error creating resume: %s", e)
-        write_output(f" - Error creating resume. Please see logs.")
-
-    if success:
-
-        output_folder_name = job_mgr.get_output_folder_name(job_title)
-
-        clickable_link = f"[Click here to open the directory](./{output_folder_name})"
-        write_output(f" - CV Directory: {clickable_link}")
-
-        if CONFIG_DATA.get("write_cover_letter", False):
-            cover_letter_creator.create_cover_letter(job_title, job_description, new_resume, output_folder_name)
-
-    return success
-
-def main() -> None:
+class JobManager:
     """
-    Main entry point for processing the user's resumes/jobs based on configuration.
+    A class responsible for creating resumes based on job descriptions
+    and matching them to existing resumes.
     """
-    # Create command to render a base CV via RenderCV
-    base_cv_cmd = (
-        f'rendercv new "{CONFIG_DATA.get("name")}" '
-        f'--theme "{CONFIG_DATA.get("theme")}"'
-    )
-    run_shell_cmd(base_cv_cmd)
+    def __init__(
+            self,
+            llm_client: OpenAIClient,
+            current_resume: dict,
+            example_yaml: dict,
+            config_data: dict,
+            user_name: str
+    ) -> None:
+        """
+        :param llm_client: Instance of the language model client (e.g., OpenAIClient).
+        :param current_resume: Dict representing the user's current resume.
+        :param example_yaml: YAML dict used as a template for new resumes.
+        :param config_data: Configuration data loaded from JSON.
+        :param user_name: The user's name for file naming.
+        """
+        self.llm_client = llm_client
+        self.current_resume = current_resume
+        self.example_yaml = example_yaml
+        self.config_data = config_data
+        self.user_name = user_name
 
-    # Prepare the username & load the template YAML
-    user_name = CONFIG_DATA.get("name", "").replace(" ", "_")
-    yaml_template_cv = f"{user_name}_CV.yaml"
-    example_yaml = load_yaml(yaml_template_cv)
+    def match_job_to_req(
+            self,
+            job_title: str,
+            job_description: str
+    ) -> float:
+        """
+        Matches a specific job to its corresponding requirements by utilizing
+        underlying matching algorithms or logic. This method performs the core
+        operation of linking or determining compatibility between job entities
+        and given requirement criteria from the user.
 
-    # Fix up 'welcome_to_RenderCV!' section if it exists
-    cv_sections = example_yaml.get('cv', {}).get('sections', {})
-    if cv_sections.get('welcome_to_RenderCV!') is not None:
-        example_yaml['cv']['sections'] = update_key_in_place(
-            cv_sections,
-            'welcome_to_RenderCV!',
-            'summary',
-            ['Hard working and experienced professional with a strong background in productive collaboration and teamwork.']
-        )
-        logger.debug(
-            "Replaced 'welcome_to_RenderCV!' with 'Summary' in %s", yaml_template_cv
+        :return: Match result or status that indicates the relationship or compatibility
+                 between the job and its requirements.
+        :rtype: Any
+        """
+        logging.info("Matching user requirements job: %s", job_title)
+
+        # Importing optional components (this is not best practice)
+        from resume_ai.app.user_data.user_data import USER_DESCR, USER_JOB_REQ
+
+        parser = JsonOutputParser(pydantic_object=UserJobMatchScore)
+        prompt = PromptTemplate(
+            template=MATCH_USER_REQ_PROMPT,
+            input_variables=["job_title", "job_description"],
+            partial_variables={
+                "user_descr": USER_DESCR,
+                "user_job_req": USER_JOB_REQ,
+                "format_instructions": parser.get_format_instructions()
+            },
         )
 
-    # Load the old resume
-    current_resume = load_pdf(RESUMES_OLD_DIR_PATH / CONFIG_DATA.get("current_resume_name"))
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        display_job_to_user_req_matching_scores(response)
 
-    # Set up an LLM client
-    llm_client = OpenAIClient()
-    logger.info("Running in '%s' mode.", CONFIG_DATA.get("mode"))
+        return response
 
-    # Create class instances
-    job_mgr = JobManager(
-        llm_client=llm_client,
-        current_resume=current_resume,
-        example_yaml=example_yaml,
-        config_data=CONFIG_DATA,
-        user_name=user_name
-    )
-    cover_letter_creator = CoverLetterCreator(
-        llm_client=llm_client,
-        user_name=user_name
-    )
 
-    # Process job descriptions
-    if CONFIG_DATA.get("mode") == 'files':
-        job_descriptions = load_txt_files_from_directory(JOB_DESCRIPTION_DIR_PATH)
+    def match_resumes_to_job(
+            self,
+            job_title: str,
+            job_description: str,
+            new_resume: dict
+    ) -> None:
+        """
+        Match current and new resumes to the specified job.
 
-        if not job_descriptions:
-            logger.error("No job descriptions found in the job_descriptions directory.")
-            raise SystemExit(1)
+        :param job_title: Title of the job.
+        :param job_description: The job description text.
+        :param new_resume: Dict representing the newly created resume.
+        :return: None
+        """
+        logging.info("Matching current resume and new resume for job: %s", job_title)
+        parser = JsonOutputParser(pydantic_object=ResumeJobMatchScore)
+        prompt = PromptTemplate(
+            template=MATCH_RESUMES_PROMPT,
+            input_variables=["job_title", "job_description"],
+            partial_variables={
+                "current_resume": self.current_resume,
+                "new_resume": new_resume,
+                "job_title": job_title,
+                "format_instructions": parser.get_format_instructions()
+            },
+        )
 
-        for job_data in job_descriptions:
-            job_title = os.path.splitext(job_data['file_name'])[0]
-            job_description = job_data['content']
-            write_output(f"""## Title: {job_title}""")
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        display_resumes_to_job_matching_scores(response)
 
-            success = process_job(job_mgr, job_title, job_description, cover_letter_creator)
+    def create_resume(
+            self,
+            job_title: str,
+            job_description: str,
+            output_dir: str
+    ) -> tuple[bool, dict]:
+        """
+        Create a resume tailored to the specified job.
 
-            # Move the processed file if applicable
-            if success:
-                move_processed_job(CONFIG_DATA.get("mode"), job_data['file_name'])
+        :param job_title: Title of the job.
+        :param job_description: The job description text.
+        :param output_dir: directory where to put the resume
+        :return: A tuple of (success_flag, new_resume_dict).
+        """
 
-    elif CONFIG_DATA.get("mode") == 'links':
-        links = load_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE)
-        unique_links = list(set(links))
+        parser = JsonOutputParser(pydantic_object=CVRoot)
+        prompt = PromptTemplate(
+            template=RESUME_TO_JOB_PROMPT,
+            input_variables=["job_title", "job_description"],
+            partial_variables={
+                "resume": self.current_resume,
+                "example": self.example_yaml.get('cv'),
+                "custom_instructions": get_custom_instructions(self.config_data),
+                "format_instructions": parser.get_format_instructions()
+            },
+        )
 
-        jobs_processed = load_jobs_processed_urls()
+        logging.info(f""" {"="*20} Creating resume for job: %s {"="*20} """, job_title)
+        job_file_name_without_extension = get_job_dir(job_title)
 
-        # Filter unprocessed jobs
-        unprocessed_unique_links = filter_unprocessed_jobs(unique_links, jobs_processed)
+        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
 
-        if not unprocessed_unique_links:
-            logger.error("No unprocessed jobs found.")
-            raise SystemExit(1)
+        # LLM has a tendency to add empty items, like `extracurricular_activities: []`. We should remove them as rendercv throws an error.
+        new_cv_dict = clean_empty(response["cv"])
 
-        # If useragent is not set, set it
-        user_agent = os.environ.get('USER_AGENT', None)
-        if not user_agent:
-            os.environ['USER_AGENT'] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        # Merge generated CV into the example YAML
+        job_specific_yaml = self.example_yaml.copy()
+        job_specific_yaml['cv'] = new_cv_dict
 
-        from resume_ai.app.classes.url_crawler import URLCrawler
-        crawler = URLCrawler(llm_client)
-        crawled_descriptions = crawler.crawl_urls(unprocessed_unique_links)
+        # Save the YAML to file
+        job_descr_resume_filename = (
+                RESUMES_NEW_YAML_DIR_PATH
+                / f"{self.user_name}__{job_file_name_without_extension}_CV.yaml"
+        )
+        save_yaml_to_file(job_specific_yaml, job_descr_resume_filename)
 
-        for job in crawled_descriptions:
-            job_link = job.metadata.get("source")
-            job_title = job.metadata.get("title", "No Title Found")
-            write_output(f"""## Title: {job_title}""")
-            write_output(f""" - [{job_link}]({job_link})""")
+        # Match the newly created resume to the job
+        self.match_resumes_to_job(job_title, job_description, new_cv_dict)
 
-            job_description = job.page_content
+        # Attempt to render the new resume
+        render_cmd = (
+            f'rendercv render "{job_descr_resume_filename}" '
+            f'--output-folder-name "{output_dir}"'
+        )
+        logging.info("Running command: %s", render_cmd)
 
-            success = process_job(job_mgr, job_title, job_description, cover_letter_creator)
-
-            # Move the processed job link
-            if success:
-                move_processed_job(CONFIG_DATA.get("mode"), job_link)
-
-    print(f"Output saved to {output_file}")
-
-if __name__ == "__main__":
-    main()
+        try:
+            run_shell_cmd(render_cmd)
+            return True, new_cv_dict
+        except Exception as e:
+            logging.exception("Error rendering resume: %s", e)
+            raise

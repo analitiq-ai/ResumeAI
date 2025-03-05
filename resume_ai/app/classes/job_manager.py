@@ -1,189 +1,462 @@
+import os
+import re
+import yaml
+import json
+import subprocess
+import shutil
 import logging
+from pathlib import Path
+from langchain_community.document_loaders import PyPDFLoader
+from rich.console import Console
+from rich.table import Table
+from rich import box
+from resume_ai.app.constants import JOBS_FILE, JOBS_PROCESSED_FILE, JOB_DESCRIPTION_DIR_PATH, JOB_DESCRIPTION_PROCESSED_DIR_PATH
 
-# Third-party imports
-from langchain_core.output_parsers import JsonOutputParser
-from langchain.prompts import PromptTemplate
-
-# Local imports
-from resume_ai.app.clients.openai_client import OpenAIClient
-from resume_ai.app.prompts import (
-    RESUME_TO_JOB_PROMPT,
-    MATCH_RESUMES_PROMPT,
-    MATCH_USER_REQ_PROMPT
-)
-from resume_ai.app.funcs import (
-    save_yaml_to_file,
-    run_shell_cmd,
-    text_to_filename,
-    get_custom_instructions,
-    display_resumes_to_job_matching_scores,
-    display_job_to_user_req_matching_scores,
-    clean_empty
-)
-from resume_ai.app.constants import (
-    RESUMES_NEW_YAML_DIR_PATH
-)
-from resume_ai.app.models import CVRoot, ResumeJobMatchScore, UserJobMatchScore
-
-
-class JobManager:
+def extract_yaml_from_string(input_string):
     """
-    A class responsible for creating resumes based on job descriptions
-    and matching them to existing resumes.
+    Extract YAML block from a string enclosed between ```yaml and ``` backticks and convert it to a Python dictionary.
+
+    Args:
+        input_string (str): The string containing the YAML block.
+
+    Returns:
+        dict: Parsed YAML content as a dictionary, or None if no YAML block is found.
     """
-    def __init__(
-            self,
-            llm_client: OpenAIClient,
-            current_resume: dict,
-            example_yaml: dict,
-            config_data: dict,
-            user_name: str
-    ) -> None:
-        """
-        :param llm_client: Instance of the language model client (e.g., OpenAIClient).
-        :param current_resume: Dict representing the user's current resume.
-        :param example_yaml: YAML dict used as a template for new resumes.
-        :param config_data: Configuration data loaded from JSON.
-        :param user_name: The user's name for file naming.
-        """
-        self.llm_client = llm_client
-        self.current_resume = current_resume
-        self.example_yaml = example_yaml
-        self.config_data = config_data
-        self.user_name = user_name
+    # Define a regular expression to match the YAML block
+    yaml_pattern = re.compile(r"```yaml\n(.*?)\n```", re.DOTALL)
+    match = yaml_pattern.search(input_string)
 
-    def match_job_to_req(
-            self,
-            job_title: str,
-            job_description: str
-        ) -> float:
-        """
-        Matches a specific job to its corresponding requirements by utilizing
-        underlying matching algorithms or logic. This method performs the core
-        operation of linking or determining compatibility between job entities
-        and given requirement criteria from the user.
-
-        :return: Match result or status that indicates the relationship or compatibility
-                 between the job and its requirements.
-        :rtype: Any
-        """
-        logging.info("Matching user requirements job: %s", job_title)
-
-        # Importing optional components (this is not best practice)
-        from resume_ai.app.user_data.user_data import USER_DESCR, USER_JOB_REQ
-
-        parser = JsonOutputParser(pydantic_object=UserJobMatchScore)
-        prompt = PromptTemplate(
-            template=MATCH_USER_REQ_PROMPT,
-            input_variables=["job_title", "job_description"],
-            partial_variables={
-                "user_descr": USER_DESCR,
-                "user_job_req": USER_JOB_REQ,
-                "format_instructions": parser.get_format_instructions()
-            },
-        )
-
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
-        display_job_to_user_req_matching_scores(response)
-
-        return response['job_to_req_match_score']
-
-
-    def match_resumes_to_job(
-            self,
-            job_title: str,
-            job_description: str,
-            new_resume: dict
-    ) -> None:
-        """
-        Match current and new resumes to the specified job.
-
-        :param job_title: Title of the job.
-        :param job_description: The job description text.
-        :param new_resume: Dict representing the newly created resume.
-        :return: None
-        """
-        logging.info("Matching current resume and new resume for job: %s", job_title)
-        parser = JsonOutputParser(pydantic_object=ResumeJobMatchScore)
-        prompt = PromptTemplate(
-            template=MATCH_RESUMES_PROMPT,
-            input_variables=["job_title", "job_description"],
-            partial_variables={
-                "current_resume": self.current_resume,
-                "new_resume": new_resume,
-                "job_title": job_title,
-                "format_instructions": parser.get_format_instructions()
-            },
-        )
-
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
-        display_resumes_to_job_matching_scores(response)
-
-    @staticmethod
-    def get_job_dir(job_title):
-        return text_to_filename(job_title)
-
-    def get_output_folder_name(self, job_title):
-        return f"rendercv_output/{self.get_job_dir(job_title)}"
-
-    def create_resume(
-            self,
-            job_title: str,
-            job_description: str
-    ) -> tuple[bool, dict]:
-        """
-        Create a resume tailored to the specified job.
-
-        :param job_title: Title of the job.
-        :param job_description: The job description text.
-        :return: A tuple of (success_flag, new_resume_dict).
-        """
-
-        parser = JsonOutputParser(pydantic_object=CVRoot)
-        prompt = PromptTemplate(
-            template=RESUME_TO_JOB_PROMPT,
-            input_variables=["job_title", "job_description"],
-            partial_variables={
-                "resume": self.current_resume,
-                "example": self.example_yaml.get('cv'),
-                "custom_instructions": get_custom_instructions(self.config_data),
-                "format_instructions": parser.get_format_instructions()
-            },
-        )
-
-        logging.info(f""" {"="*20} Creating resume for job: %s {"="*20} """, job_title)
-        job_file_name_without_extension = self.get_job_dir(job_title)
-        output_folder_name = self.get_output_folder_name(job_title)
-
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
-
-        # LLM has a tendency to add empty items, like `extracurricular_activities: []`. We should remove them as rendercv throws an error.
-        new_cv_dict = clean_empty(response["cv"])
-
-        # Merge generated CV into the example YAML
-        job_specific_yaml = self.example_yaml.copy()
-        job_specific_yaml['cv'] = new_cv_dict
-
-        # Save the YAML to file
-        job_descr_resume_filename = (
-                RESUMES_NEW_YAML_DIR_PATH
-                / f"{self.user_name}__{job_file_name_without_extension}_CV.yaml"
-        )
-        save_yaml_to_file(job_specific_yaml, job_descr_resume_filename)
-
-        # Match the newly created resume to the job
-        self.match_resumes_to_job(job_title, job_description, new_cv_dict)
-
-        # Attempt to render the new resume
-        render_cmd = (
-            f'rendercv render "{job_descr_resume_filename}" '
-            f'--output-folder-name "{output_folder_name}"'
-        )
-        logging.info("Running command: %s", render_cmd)
-
+    if match:
+        yaml_content = match.group(1)
         try:
-            run_shell_cmd(render_cmd)
-            return True, new_cv_dict
-        except Exception as e:
-            logging.exception("Error rendering resume: %s", e)
-            raise
+            # Parse the YAML content into a Python dictionary
+            parsed_yaml = yaml.safe_load(yaml_content)
+            return parsed_yaml
+        except yaml.YAMLError as e:
+            print("Error parsing YAML:", e)
+            return None
+    else:
+        print("No valid YAML block found in the input string.")
+        return None
+
+def save_yaml_to_file(data, filename):
+    """
+    Save a dictionary to a file in YAML format.
+
+    Args:
+        data (dict): The data to save.
+        filename (str): The file path where the YAML content will be saved.
+    """
+
+    try:
+        with open(filename, 'w') as file:
+            yaml.dump(data, file, default_flow_style=False, sort_keys=False) # By default, yaml.dump() attempts to sort dictionary keys alphabetically, unless explicitly configured otherwise.
+        logging.debug(f"YAML saved successfully to {filename}")
+    except Exception as e:
+        logging.error("Error saving YAML to file:", e)
+
+
+def load_yaml(file_name):
+    """
+    Load the contents of a YAML file into a Python dictionary. This function reads a
+    YAML file specified by its file name, parses the content using a safe YAML loader,
+    and returns the parsed data as a dictionary. If the file does not exist, cannot
+    be parsed, or an unexpected error occurs, the function logs the respective error.
+
+    :param file_name: The path to the YAML file to load.
+    :type file_name: str
+    :return: The contents of the YAML file loaded into a Python dictionary.
+    :rtype: dict or None
+    """
+    try:
+        # Open the YAML file
+        with open(file_name, 'r') as file:
+            # Load the content into a Python dictionary
+            yaml_data = yaml.safe_load(file)
+            return yaml_data
+    except FileNotFoundError:
+        logging.error(f"Error: File '{file_name}' not found.")
+    except yaml.YAMLError as e:
+        logging.error(f"Error parsing YAML file: {e}")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
+
+
+def load_pdf(file_path) -> str or None:
+    """
+    Loads the content of a PDF file and returns it as a single concatenated string
+    of all pages' text. The function splits the PDF document into individual pages
+    and extracts the textual content from each. If the file is not found, it raises
+    a FileNotFoundError, and for any other unexpected errors, it logs the error
+    message without terminating the process.
+
+    :param file_path: Path to the PDF file to be loaded.
+    :type file_path: str
+    :return: A single string containing concatenated textual content of the PDF
+        pages, or None if an error occurs.
+    :rtype: str or None
+    """
+    try:
+        # Initialize PDF Loader
+        loader = PyPDFLoader(file_path)
+
+        # Load documents (splits the PDF into pages)
+        documents = loader.load()
+
+        return " ".join([doc.page_content for doc in documents])
+
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+
+def load_txt_files_from_directory(directory_path):
+    """
+    Load all .txt files from the specified directory, parse their content,
+    and extract file names (without extension).
+
+    Args:
+        directory_path (str): Path to the directory containing .txt files.
+
+    Returns:
+        list: A list of dictionaries, each containing 'file_name' and 'content' keys.
+    """
+    parsed_files = []
+
+    # Iterate through all files in the directory
+    for file_name in os.listdir(directory_path):
+        if file_name.endswith(".txt"):
+            file_path = os.path.join(directory_path, file_name)
+
+            # Open and read the file content
+            with open(file_path, 'r') as file:
+                content = file.read()
+
+            # Add parsed content and file name to the list
+            parsed_files.append({
+                'file_name': file_name,
+                'content': content
+            })
+
+    return parsed_files
+
+def run_shell_cmd(cmd):
+    """
+    Executes a given shell command and captures its output and execution status.
+
+    This function utilizes the subprocess.run method to execute
+    a shell command in a controlled environment. It captures
+    both the standard output and the standard error, evaluates
+    the command's return code, and prints the appropriate
+    output message indicating success or failure.
+
+    :param cmd: The shell command to be executed.
+    :type cmd: str
+    :return: None
+    """
+    # Execute the command in the shell
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+    # Check the command's output and status
+    if result.returncode == 0:
+        print("Command executed successfully.")
+        print(result.stdout)
+    else:
+        error_msg = f"""
+Command execution failed with return code: {result.returncode}
+STDERR: {result.stderr}
+STDOUT: {result.stdout}
+Command: {cmd}
+"""
+        logging.error(error_msg)
+        raise subprocess.CalledProcessError(
+            returncode=result.returncode,
+            cmd=cmd,
+            output=result.stdout,
+            stderr=result.stderr
+        )
+
+def load_json(file_path):
+    """
+    Loads a JSON file from the given file path and parses its contents.
+
+    This function attempts to open the specified file path and load its content
+    as JSON. If the file does not exist or is not a valid JSON format, an error
+    message is displayed and the program exits.
+
+    :param file_path: The path to the JSON file that needs to be loaded.
+    :type file_path: str
+    :return: The parsed data as a dictionary or list, depending on the JSON structure.
+    :rtype: dict | list
+    :raises FileNotFoundError: Raised when the specified file cannot be found.
+    :raises json.JSONDecodeError: Raised when the file contains invalid JSON formatting.
+    :raises Exception: Raised for any other unexpected exception during file loading.
+    """
+    try:
+        # Load the json file
+        with open(file_path, 'r') as json_file:
+            config_data = json.load(json_file)
+
+        return config_data
+
+    except FileNotFoundError as e:
+        raise e
+
+    except json.JSONDecodeError:
+        exit("Error decoding file. Ensure it is properly formatted JSON.")
+
+    except Exception as e:
+        exit(f"An unexpected error occurred: {e}")
+
+def save_json(filename, data):
+    """Saves JSON data to a file."""
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=2)
+
+def move_processed_job_file(filename: str) -> None:
+    """
+    Moves a file from the current location to the new location
+
+    Args:
+        filename (str): filename to move.
+    """
+    # Validate current file exists
+    current_location = JOB_DESCRIPTION_DIR_PATH / filename
+    new_location = JOB_DESCRIPTION_PROCESSED_DIR_PATH / filename
+
+    if not os.path.isfile(current_location):
+        raise FileNotFoundError(f"The file '{current_location}' does not exist.")
+
+    # Move the file
+    shutil.move(current_location, new_location)
+    logging.info(f"""File moved successfully: "{new_location}" """)
+
+def load_jobs_processed_urls():
+    "Loads the list of processed job URLs. If the file does not exist, it will return an empty list."
+    try:
+        jobs_processed = load_json(JOB_DESCRIPTION_PROCESSED_DIR_PATH /JOBS_PROCESSED_FILE)
+    except FileNotFoundError:
+        logging.info(f"Processed job file not found: {JOBS_PROCESSED_FILE}")
+        jobs_processed = []
+    return jobs_processed
+
+def move_processed_job_url(job_url):
+    """Moves a processed job from jobs.json to jobs_processed.json."""
+    jobs = load_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE)
+
+    jobs_processed = load_jobs_processed_urls()
+
+    if job_url in jobs:
+        jobs.remove(job_url)
+        jobs_processed.append(job_url)
+
+        save_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE, jobs)
+        save_json(JOB_DESCRIPTION_PROCESSED_DIR_PATH / JOBS_PROCESSED_FILE, jobs_processed)
+        logging.info(f"Moved url for job to processed: {job_url}")
+    else:
+        logging.error(f"Job not found in {JOBS_FILE}")
+
+def move_processed_job(mode: str, item: str):
+    """Moves a processed job that is either a URL or a file path"""
+    if mode == "links":
+        move_processed_job_url(item)
+    elif mode == "files":
+        move_processed_job_file(item)
+
+def filter_unprocessed_jobs(jobs, jobs_processed):
+    """Returns a list of jobs that have not been processed."""
+    return [job for job in jobs if job not in jobs_processed]
+
+def update_key_in_place(d, old_key, new_key, new_value):
+    """
+    Updates a dictionary by replacing a specific key-value pair with a new key-value
+    pair in-place while maintaining the order of elements. This function does not
+    modify the original dictionary directly but constructs a new dictionary with
+    the updated key-value pair and returns it.
+
+    :param d: Dictionary in which the key-value pair will be updated
+    :type d: dict
+    :param old_key: Key to be replaced in the dictionary
+    :type old_key: Any
+    :param new_key: New key to replace the old one
+    :type new_key: Any
+    :param new_value: New value to associate with the new key
+    :type new_value: Any
+    :return: A new dictionary with the updated key-value pair
+    :rtype: dict
+    """
+    items = list(d.items())  # Get the list of key-value pairs
+    for i, (key, value) in enumerate(items):
+        if key == old_key:
+            items[i] = (new_key, new_value)  # Replace the key-value pair
+            break
+    return dict(items)
+
+def text_to_filename(text: str) -> str:
+    """
+    Converts a given line of text into a filename-friendly format.
+
+    - Only alphanumeric characters are kept.
+    - Spaces are replaced with underscores.
+    - Non-alphanumeric characters are removed.
+
+    Args:
+        text (str): The input line of text.
+
+    Returns:
+        str: A string formatted as a valid filename.
+    """
+    # Replace spaces with underscores
+    text = text.replace(" ", "_")
+    text = text.replace("/", "_") # important for links
+
+    # Remove non-alphanumeric characters except underscores
+    text = re.sub(r"[^a-zA-Z0-9_]", "", text)
+
+    return text
+
+def get_custom_instructions(config_data: dict):
+    """
+    Generate custom instructions for resume creation based on the provided configuration data.
+
+    This function interprets the configuration data and constructs tailored instructions
+    that can be used to modify or review a resume according to the specified requirements.
+    Key aspects like word count guidance for job experience and preferences for resume
+    page length are taken into consideration.
+
+    :param config_data: Contains configuration data with keys that specify resume requirements
+      including desired word count and page preferences
+    :type config_data: dict
+
+    :return: A string containing the generated custom instructions based on the given configuration data
+    :rtype: str
+    """
+    custom_instructions = ""
+
+    if config_data.get('target_highlights_length_words', 0) > 0:
+        custom_instructions += f"The text for each job in the experience section should have about {config_data.get('target_highlights_length_words')} words.\n Try to come close to that limit without exceeding it.\n Avoid misrepresenting skills or experience or inventing what is not listed on my resume.\n"
+
+    if config_data.get('multiple_pages', False):
+        custom_instructions += "It is fine if the resume spans multiple pages, as long as the quality of the resume matches the job description.\n"
+    else:
+        custom_instructions += "Try to keep the experience section concise so the resume fits into a single page.\n"
+
+    return custom_instructions
+
+def display_job_to_user_req_matching_scores(response):
+    """
+    Displays a comparison of matching scores between a job and user requirements,
+    along with an analysis message of positives and negatives. Outputs a formatted table displaying the score,
+    and an analysis panel of positives and negatives for each job
+
+    :param response: A dictionary containing the matching scores and analysis description.
+                     Expected keys:
+                       - 'old_resume_match_score' (float): The match score for the old resume (0 to 1).
+                       - 'new_resume_match_score' (float): The match score for the new resume (0 to 1).
+                       - 'description' (str): An analysis text or description to explain the scores.
+    :return: None
+    """
+    console = Console()
+
+    # Create score comparison table
+    score_table = Table(
+        title="Job to User Requirements Match Comparison",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan"
+    )
+
+    score_table.add_column("Parameter", style="cyan")
+    score_table.add_column("Value or Descr", style="magenta")
+
+    # Add rows with percentage formatting
+    score_table.add_row(
+        "Job Match to User Requirements (Score)",
+        f"{response['job_to_req_match_score'] * 100:.1f}%\n"
+    )
+
+    score_table.add_row(
+        "Job Positives",
+        f"{response['job_positives']}\n"
+    )
+    score_table.add_row(
+        "Job Negatives",
+        f"{response['job_negatives']}"
+    )
+
+    # Print everything with some spacing
+    console.print(score_table, justify="left")
+
+def display_resumes_to_job_matching_scores(response):
+    """
+    Displays a comparison of matching scores between an old and a new resume,
+    along with an analysis message. Outputs a formatted table displaying the scores,
+    and an analysis panel with the provided description.
+
+    :param response: A dictionary containing the matching scores and analysis description.
+                     Expected keys:
+                       - 'old_resume_match_score' (float): The match score for the old resume (0 to 1).
+                       - 'new_resume_match_score' (float): The match score for the new resume (0 to 1).
+                       - 'description' (str): An analysis text or description to explain the scores.
+    :return: None
+    """
+    console = Console()
+
+    # Create score comparison table
+    score_table = Table(
+        title="Resumes to Job Match Comparison",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan"
+    )
+
+    score_table.add_column("Parameter", style="cyan")
+    score_table.add_column("Value or Description", style="magenta")
+
+    # Add rows with percentage formatting
+    score_table.add_row(
+        "Old Resume Match Score",
+        f"{response['old_resume_match_score'] * 100:.1f}%\n"
+    )
+    score_table.add_row(
+        "New Resume Match Score",
+        f"{response['new_resume_match_score'] * 100:.1f}%\n"
+    )
+
+    score_table.add_row(
+        "Analysis",
+        f"{response['description']}"
+    )
+
+    # Print everything with some spacing
+    console.print("\n")
+    console.print(score_table, justify="left")
+    console.print("\n")
+
+def clean_empty(d):
+    """
+    Recursively remove empty lists, empty dictionaries, or None values from a dictionary
+
+    :param d: Input dictionary or list
+    :return: Cleaned dictionary or list with empty values removed
+    """
+    if isinstance(d, dict):
+        return {
+            k: v
+            for k, v in ((k, clean_empty(v)) for k, v in d.items())
+            if v not in (None, [], {})
+        }
+    elif isinstance(d, list):
+        return [v for v in (clean_empty(v) for v in d) if v not in (None, "", [], {})]
+    else:
+        return d
+
+
+def get_job_dir(job_title):
+    return text_to_filename(job_title)
+
+def get_output_folder_name(job_identifier):
+    # to easy find resumes, we should organise them by link or by doc title for files, which should be position title.
+    dir = get_job_dir(job_identifier)
+    return f"rendercv_output/{dir}"

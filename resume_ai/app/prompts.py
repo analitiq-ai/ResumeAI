@@ -74,9 +74,17 @@ Your response must adhere to the format stated below in the section "Format inst
 """
 
 MATCH_USER_REQ_PROMPT = """
-You are a recruiter who is hiring for a job: {job_title}.
-I would like you to critically examine my current resume and the new resume I have created specifically for this job.
-Compare each resume to the job description and provide me back score for each on how well it matches the job description.
+I would like you to examine the provided Job Description against the provided User Description and User Job Preferences.
+Please provide me back the overall score of how you think the Job Description matches the User Description and User Job Preferences.
+When evaluating the Job Description, you should consider the following aspects:
+- If you can extrapolate something from the job description with high degree of certainty, you should consider it in score calculation.
+- Do not make assumptions for something that is absent from the job description
+- If user requirement or preference is not explicitly defined in the job description, and you cannot extrapolate it with a high degree of certainty, there is no impact the match score.
+- If some requirements of the job are not explicitly mentioned by the user in preferences, there is no impact the match score.
+- Consider user description in evaluating the match score. For example, a junior role is unlikely to fit a user with many years of experience.
+- Only include explicitly mentioned parameters, or strongly implied parameters, in your evaluation and your response.
+- Do not consider any other parameters in your evaluation that are your guesses or assumptions and are not implied or mentioned in the job description.
+
 Your response must adhere to the format stated below in the section "Format instructions".
 
 ## User Description:
@@ -84,7 +92,7 @@ Your response must adhere to the format stated below in the section "Format inst
 {user_descr}
 ```
 
-## User Job Requirements:
+## User Job Preferences:
 ```
 {user_job_req}
 ```

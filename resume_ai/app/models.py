@@ -69,6 +69,6 @@ class ResumeJobMatchScore(BaseModel):
     description: float = Field(..., description="Add here any evaluation text that you feel is important.")
 
 class UserJobMatchScore(BaseModel):
-    job_positives: str = Field(..., description="Short list of job parameters that explicitly match users requirements.")
-    job_negatives: str = Field(..., description="Short list of job parameters that explicitly do not match users requirements.")
+    job_positives: str = Field(..., description="Short list of explicitly mentioned job properties that match users requirements. Do not include ")
+    job_negatives: str = Field(..., description="Short list of explicitly mentioned job properties that do not match users requirements.")
     job_to_req_match_score: float = Field(..., description="Score indicating how well the job matches the user requirements, ranging from 0 to 1 as a float.")

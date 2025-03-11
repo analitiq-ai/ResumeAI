@@ -72,3 +72,10 @@ class UserJobMatchScore(BaseModel):
     job_positives: str = Field(..., description="Short list of explicitly mentioned job properties that match users requirements. Do not include ")
     job_negatives: str = Field(..., description="Short list of explicitly mentioned job properties that do not match users requirements.")
     job_to_req_match_score: float = Field(..., description="Score indicating how well the job matches the user requirements, ranging from 0 to 1 as a float.")
+
+class JobRequirements(BaseModel):
+    job_requirements: str = Field(..., description="A summary of key job requirements extrapolated from the job description.")
+    sentence_keywords: List[str] = Field(..., description="A list of keywords that are extracted from the job description.")
+
+class ResumeImprovements(BaseModel):
+    resume_improvements: List[str] = Field(..., description="A summary of improvements that can be made to the resume based on the job description.")

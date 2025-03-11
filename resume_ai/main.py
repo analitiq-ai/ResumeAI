@@ -128,7 +128,6 @@ def process_job(job_mgr: JobManager, job_title: str, job_description: str, cover
     write_output('\n**Job Keywords:** ' + ', '.join(results.get('get_job_req').get('sentence_keywords')))
 
     #print(f"Resume improvements: {results['resume_improvements']}")
-    exit()
 
     if CONFIG_DATA.get("match_job_to_user_pref"):
         response = results['match_job_to_user_req']

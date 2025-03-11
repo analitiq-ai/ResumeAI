@@ -1,9 +1,9 @@
 {
   "name": "Darth Vader",
-  "current_resume_name": "DARTH VADER CV.pdf",
+  "resume_filename": "DARTH VADER CV.pdf",
   "mode": "links",
   "theme": "engineeringresumes",
-  "wordai_api_key": "",
+  "profile_filename": "user_profile_1.py",
   "target_highlights_length_words": 200,
   "multiple_pages": true,
   "write_cover_letter": true,

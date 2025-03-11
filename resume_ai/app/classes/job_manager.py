@@ -22,7 +22,8 @@ from resume_ai.app.funcs import (
     clean_empty
 )
 from resume_ai.app.constants import (
-    RESUMES_NEW_YAML_DIR_PATH
+    RESUMES_NEW_YAML_DIR_PATH,
+    USER_DATA_DIR_PATH
 )
 from resume_ai.app.models import (
     CVRoot,
@@ -77,15 +78,16 @@ class JobManager:
         logging.info("Matching user requirements job: %s", job_title)
 
         # Importing optional components (this is not best practice)
-        from resume_ai.app.user_data.user_data import USER_DESCR, USER_JOB_REQ
+        from importlib import import_module
+        user_data = import_module(f"{USER_DATA_DIR_PATH}.{self.config_data['profile_filename']}")
 
         parser = JsonOutputParser(pydantic_object=UserJobMatchScore)
         prompt = PromptTemplate(
             template=MATCH_USER_REQ_PROMPT,
             input_variables=["job_title", "job_description"],
             partial_variables={
-                "user_descr": USER_DESCR,
-                "user_job_req": USER_JOB_REQ,
+                "user_descr": user_data.USER_DESCR,
+                "user_job_req": user_data.USER_JOB_REQ,
                 "format_instructions": parser.get_format_instructions()
             },
         )

@@ -17,6 +17,7 @@ Skip the jobs that are **not a good match for you:**
 ## Key Features
 
 - **Job Matching to Your Preferences**: Use AI to check how well the job description matches your personality and your job requirements.
+- **Multiple Profiles**: Create multiple profiles for each type of job you are looking for. Part-time, contract, remote.
 - **AI-Powered Resume Generation**: Automatically creates tailored resumes for specific job descriptions using LLMs of your choice (Bedrock and OpenAI are supported)
 - **Old vs New Resume Comparison**: Compares both your current and newly generated resume against job requirements with detailed scoring
 - **Multiple way to add Job Description**: Process job descriptions from:
@@ -28,13 +29,14 @@ Skip the jobs that are **not a good match for you:**
 
 # Quickstart
 1. run `poetry install` to set up dependencies
-2. put your old CVs into **resume_ai/app/user_data/resumes** directory
-3. update config.json with:
+2. put your old CVs into **resume_ai/user_data/resumes** directory
+3. update `user_profile_1.py` or create a new profile file with .py extension. Write a bit about yourself and what kind of job you are looking for.
+4. update config.json with:
  - your name
- - the path to your old CV
+ - the path to your old CV that will be used as template
+ - the path to the profile you would like to use for the job search
  - operating mode (files or links)
- - your theme. Default is `engineeringresumes` Check out themes here: https://github.com/rendercv/rendercv/tree/main/examples
- - your job preferences in file `resume_ai/app/user_data/user_data.py`
+ - preferred theme for the resume. Default is `engineeringresumes` Check out themes here: https://github.com/rendercv/rendercv/tree/main/examples
 
 Watch the video bellow for a quick guide:
 
@@ -44,11 +46,11 @@ Watch the video bellow for a quick guide:
 ```json
 {
   "name": "Your Name",
-  "current_resume_name": "your-current-resume.pdf",
+  "resume_filename": "your-current-resume.pdf",
   "mode": "files",
   "theme": "chosen-theme",
   "target_highlights_length_words": 50,
-  "wordai_api_key": "",
+  "profile_filename": "user_profile_1.py",
   "multiple_pages": false,
   "write_cover_letter": false,
   "match_job_to_user_pref": true
@@ -62,7 +64,7 @@ Watch the video bellow for a quick guide:
     - `links`: Process job descriptions from URLs
 - **theme**: Select from available [rendercv themes](https://github.com/rendercv/rendercv/tree/main/examples)
 - **target_highlights_length_words**: Set target word count for experience highlights
-- **wordai_api_key**: Optional API key for WordAI integration to avoid AI detection
+- **profile_filename**: This is your profile file where you describe about yourself and what you are looking for in a job.
 - **multiple_pages**: Allow resume to span multiple pages if needed
 - **write_cover_letter**: Enable automatic cover letter generation
 - **match_job_to_user_pref**: If you had filled in your job preferences in `user_data.py`, AI will tell you how well the job matches to your requirements.
@@ -92,8 +94,8 @@ Watch the video bellow for a quick guide:
 
 ### Skipping jobs that are not a good match
 If you do not want to apply for jobs that are an obvious bad match (example, you want part-time and the job offers full-time only), you can enable that in config parameters. So, resumes will be created only for the jobs, whose description matches at least X% of your requirements.
-1. Write your requirements in `resume_ai/app/user_data/user_data_TEMPLATE.py`
-2. rename it to `resume_ai/app/user_data/user_data.py`
+1. Write your requirements in `resume_ai/user_data/user_data_TEMPLATE.py`
+2. rename it to `resume_ai/user_data/user_data.py`
 3. Set `match_job_to_user_pref` in config to 'true'
 4. Set % match threshold for `match_job_to_user_pref_limit` in config to a float (ex: 0.85 = 85%)
 

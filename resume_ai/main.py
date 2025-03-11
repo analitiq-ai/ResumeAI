@@ -48,7 +48,7 @@ set_verbose(False)
 # ----------------------------------------------------------------------------------
 # Load Config
 # ----------------------------------------------------------------------------------
-CONFIG_DATA = load_json("app/config.json")
+CONFIG_DATA = load_json("config.json")
 
 # ----------------------------------------------------------------------------------
 # Run output file
@@ -192,11 +192,11 @@ def main() -> None:
         )
 
     # Load the old resume
-    current_resume = load_pdf(RESUMES_OLD_DIR_PATH / CONFIG_DATA.get("current_resume_name"))
+    current_resume = load_pdf(RESUMES_OLD_DIR_PATH / CONFIG_DATA.get('resume_filename'))
 
     # Set up an LLM client
     llm_client = OpenAIClient()
-    logger.info("Running in '%s' mode.", CONFIG_DATA.get("mode"))
+    logger.info("Running in '%s' mode.", CONFIG_DATA.get('mode'))
 
     # Create class instances
     job_mgr = JobManager(

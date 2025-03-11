@@ -73,12 +73,27 @@ Your response must adhere to the format stated below in the section "Format inst
 {format_instructions}
 """
 
+EXAMINE_JOB_REQUIREMENTS = """
+Examine the attached job description for {job_title}.
+Provide back the key requirements for the job as ell as a list of keywords or key sentences that should exist in a successful candidate's resume'.
+Look for elements that are explicitly mentioned in the job description in multiple places or are strongly implied.
+Keep your response short and concise.
+
+## Job description:
+```
+{job_description}
+```
+
+## Response format instructions:
+{format_instructions}
+"""
+
 MATCH_USER_REQ_PROMPT = """
 I would like you to examine the provided Job Description against the provided User Description and User Job Preferences.
 Please provide me back the overall score of how you think the Job Description matches the User Description and User Job Preferences.
 When evaluating the Job Description, you should consider the following aspects:
 - If you can extrapolate something from the job description with high degree of certainty, you should consider it in score calculation.
-- Do not make assumptions for something that is absent from the job description
+- Do not make assumptions for something that is not explicitly present in the the job description
 - If user requirement or preference is not explicitly defined in the job description, and you cannot extrapolate it with a high degree of certainty, there is no impact the match score.
 - If some requirements of the job are not explicitly mentioned by the user in preferences, there is no impact the match score.
 - Consider user description in evaluating the match score. For example, a junior role is unlikely to fit a user with many years of experience.
@@ -105,3 +120,24 @@ Your response must adhere to the format stated below in the section "Format inst
 ## Format instructions:
 {format_instructions}
 """
+
+LIST_RESUME_IMPROVEMENTS = """
+Act as a critical recruiter for the position of {job_title}.
+Examine Job Description against User Resume.
+Provide a list of improvements to the resume that would make it more relevant to the job description.
+Use the same verbiage and keywords in your recommendation as in the job description.
+
+## User Resume:
+```
+{user_resume}
+```
+
+## Job Description:
+```
+{job_description}
+```
+
+## Format instructions:
+{format_instructions}
+"""
+

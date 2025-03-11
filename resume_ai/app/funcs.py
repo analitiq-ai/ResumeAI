@@ -316,7 +316,7 @@ def text_to_filename(text: str) -> str:
 
     return text
 
-def get_custom_instructions(config_data: dict):
+def get_custom_instructions(custom_instructions_data: dict):
     """
     Generate custom instructions for resume creation based on the provided configuration data.
 
@@ -325,22 +325,27 @@ def get_custom_instructions(config_data: dict):
     Key aspects like word count guidance for job experience and preferences for resume
     page length are taken into consideration.
 
-    :param config_data: Contains configuration data with keys that specify resume requirements
-      including desired word count and page preferences
-    :type config_data: dict
+    :param custom_instructions_data: Contains configuration data for custom instructions with keys that specify resume requirements including desired word count and page preferences
+    :type custom_instructions_data: dict
 
     :return: A string containing the generated custom instructions based on the given configuration data
     :rtype: str
     """
     custom_instructions = ""
 
-    if config_data.get('target_highlights_length_words', 0) > 0:
-        custom_instructions += f"The text for each job in the experience section should have approximately {config_data.get('target_highlights_length_words')} words.\n"
+    if custom_instructions_data.get('target_highlights_length_words', 0) > 0:
+        custom_instructions += f"The text for each job in the experience section should have about {custom_instructions_data.get('target_highlights_length_words')} words.\n Try to come close to that limit without exceeding it.\n Avoid misrepresenting skills or experience or inventing what is not listed on my resume.\n"
 
-    if config_data.get('multiple_pages', False):
+    if custom_instructions_data.get('multiple_pages', False):
         custom_instructions += "It is fine if the resume spans multiple pages, as long as the quality of the resume matches the job description.\n"
     else:
         custom_instructions += "Try to keep the experience section concise so the resume fits into a single page.\n"
+
+    if custom_instructions_data.get('resume_improvements', None) is not None:
+        custom_instructions += "### Recommended improvements for the resume\n"
+        custom_instructions += "Without exaggerating or lying, apply the following resume improvements if they match what is already implied in the resume.\n"
+        custom_instructions += "Try to stay close to the verbiage used in the recommended improvements.\n"
+        custom_instructions += '\n - '.join(f"{i + 1}. {improvement}" for i, improvement in enumerate(custom_instructions_data.get('resume_improvements')))
 
     return custom_instructions
 
@@ -451,3 +456,12 @@ def clean_empty(d):
         return [v for v in (clean_empty(v) for v in d) if v not in (None, "", [], {})]
     else:
         return d
+
+
+def get_job_dir(job_title):
+    return text_to_filename(job_title)
+
+def get_output_folder_name(job_identifier):
+    # to easy find resumes, we should organise them by link or by doc title for files, which should be position title.
+    dir = get_job_dir(job_identifier)
+    return f"rendercv_output/{dir}"

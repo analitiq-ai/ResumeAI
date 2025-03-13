@@ -79,3 +79,8 @@ class JobRequirements(BaseModel):
 
 class ResumeImprovements(BaseModel):
     resume_improvements: List[str] = Field(..., description="A summary of improvements that can be made to the resume based on the job description.")
+
+class JobDetails(BaseModel):
+    is_active: bool = Field(..., description="True or False indicating whether the job is active or not.")
+    job_title: Optional[str] = Field(..., description="The title of the job.")
+    job_description: Optional[str] = Field(..., description="The full text of the job description.")

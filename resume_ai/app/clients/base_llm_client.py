@@ -81,7 +81,8 @@ class BaseLlm(ABC):
             logger.error("Error during image processing: %s", e)
             raise
 
-    def invoke_llm(self, prompt: Any, job_title: str, job_descr: str, parser: Any = None):
+    def invoke_llm(self, prompt: Any, params_dic: dict, parser: Any = None):
+        # {"job_title": job_title, "job_description": job_descr}
         try:
             # Check if the parser is provided
             if parser:
@@ -89,7 +90,7 @@ class BaseLlm(ABC):
             else:
                 table_chain = prompt | self.llm
 
-            response = table_chain.invoke({"job_title": job_descr, "job_description": job_descr})
+            response = table_chain.invoke(params_dic)
             logger.info("LLM invocation successful.")
 
             return response

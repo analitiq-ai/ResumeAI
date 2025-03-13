@@ -54,7 +54,7 @@ class CoverLetterCreator:
             },
         )
 
-        response = self.llm_client.invoke_llm(prompt_create_cover_letter, job_title, job_description)
+        response = self.llm_client.invoke_llm(prompt_create_cover_letter, {"job_title": job_title, "job_description": job_description})
         #logging.info("Cover letter text:\n%s", response.content)
 
         output_filename = (

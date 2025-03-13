@@ -102,14 +102,19 @@ When evaluating the Job Description, you should consider the following aspects:
 
 Your response must adhere to the format stated below in the section "Format instructions".
 
-## User Description:
+## User Personal Information:
 ```
-{user_descr}
+{personal_info}
+```
+
+## User Work Preferences:
+```
+{work_preferences}
 ```
 
 ## User Job Preferences:
 ```
-{user_job_req}
+{job_requirements}
 ```
 
 ## Job Description:
@@ -141,3 +146,29 @@ Use the same verbiage and keywords in your recommendation as in the job descript
 {format_instructions}
 """
 
+
+CHECK_SCRAPED_PAGE = """
+I will provide you a URL and a page content.
+I need to know if the page content contains a valid and active job ad.
+Evaluate the URL, Page Title and Page Content to determine if it is a valid job ad.
+Often websites will show a list of similar jobs if the current job is not active.
+If the job is active, the page should prominently display the job title, job description and other details.
+If it looks to you like the page is displaying an active job rather than a list of similar jobs, I want you to extract the job title and job description and return them to me formated as per format instructions.
+If you find that this is not a valid job description, return "False" in the response property 'active' and nothing else.
+
+## URL
+{url}
+
+## Page Title
+```
+{page_title}
+```
+
+## Page Content
+```
+{page_content}
+```
+
+## Format instructions:
+{format_instructions}
+"""

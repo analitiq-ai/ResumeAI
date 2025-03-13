@@ -10,7 +10,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from rich.console import Console
 from rich.table import Table
 from rich import box
-from resume_ai.app.constants import JOBS_FILE, JOBS_PROCESSED_FILE, JOB_DESCRIPTION_DIR_PATH, JOB_DESCRIPTION_PROCESSED_DIR_PATH
+from resume_ai.app.constants import JOBS_FILE, JOBS_FILE, JOBS_DIR_PATH, JOBS_PROCESSED_DIR_PATH
 
 def extract_yaml_from_string(input_string):
     """
@@ -204,7 +204,7 @@ def load_json(file_path):
         raise e
 
     except json.JSONDecodeError:
-        exit("Error decoding file. Ensure it is properly formatted JSON.")
+        exit(f"Error decoding file. Ensure it is properly formatted JSON. {file_path}")
 
     except Exception as e:
         exit(f"An unexpected error occurred: {e}")
@@ -222,8 +222,8 @@ def move_processed_job_file(filename: str) -> None:
         filename (str): filename to move.
     """
     # Validate current file exists
-    current_location = JOB_DESCRIPTION_DIR_PATH / filename
-    new_location = JOB_DESCRIPTION_PROCESSED_DIR_PATH / filename
+    current_location = JOBS_DIR_PATH / filename
+    new_location = JOBS_PROCESSED_DIR_PATH / filename
 
     if not os.path.isfile(current_location):
         raise FileNotFoundError(f"The file '{current_location}' does not exist.")
@@ -232,27 +232,18 @@ def move_processed_job_file(filename: str) -> None:
     shutil.move(current_location, new_location)
     logging.info(f"""File moved successfully: "{new_location}" """)
 
-def load_jobs_processed_urls():
-    "Loads the list of processed job URLs. If the file does not exist, it will return an empty list."
-    try:
-        jobs_processed = load_json(JOB_DESCRIPTION_PROCESSED_DIR_PATH /JOBS_PROCESSED_FILE)
-    except FileNotFoundError:
-        logging.info(f"Processed job file not found: {JOBS_PROCESSED_FILE}")
-        jobs_processed = []
-    return jobs_processed
 
 def move_processed_job_url(job_url):
-    """Moves a processed job from jobs.json to jobs_processed.json."""
-    jobs = load_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE)
-
-    jobs_processed = load_jobs_processed_urls()
+    """Moves a processed job from jobs.json to success/jobs.json."""
+    jobs = load_json(JOBS_DIR_PATH / JOBS_FILE)
+    jobs_processed = load_json(JOBS_PROCESSED_DIR_PATH / JOBS_FILE)
 
     if job_url in jobs:
         jobs.remove(job_url)
         jobs_processed.append(job_url)
 
-        save_json(JOB_DESCRIPTION_DIR_PATH / JOBS_FILE, jobs)
-        save_json(JOB_DESCRIPTION_PROCESSED_DIR_PATH / JOBS_PROCESSED_FILE, jobs_processed)
+        save_json(JOBS_DIR_PATH / JOBS_FILE, jobs)
+        save_json(JOBS_PROCESSED_DIR_PATH / JOBS_FILE, jobs_processed)
         logging.info(f"Moved url for job to processed: {job_url}")
     else:
         logging.error(f"Job not found in {JOBS_FILE}")
@@ -465,3 +456,6 @@ def get_output_folder_name(job_identifier):
     # to easy find resumes, we should organise them by link or by doc title for files, which should be position title.
     dir = get_job_dir(job_identifier)
     return f"rendercv_output/{dir}"
+
+def get_clean_user_name(name: str):
+    return name.replace(" ", "_").lower()

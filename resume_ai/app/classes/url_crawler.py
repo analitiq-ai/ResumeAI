@@ -34,7 +34,6 @@ class URLCrawler:
         loader = AsyncHtmlLoader(urls)
         docs = loader.load()
 
-
         # Transform the documents to plain text
         html2text = Html2TextTransformer()
         docs_transformed = html2text.transform_documents(docs)

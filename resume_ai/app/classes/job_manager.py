@@ -1,25 +1,34 @@
 import logging
+import asyncio
+from pathlib import Path
+from dataclasses import dataclass
 
 # Third-party imports
 from langchain_core.output_parsers import JsonOutputParser
 from langchain.prompts import PromptTemplate
 
 # Local imports
-from resume_ai.app.clients.openai_client import OpenAIClient
+from resume_ai.app.classes.cover_letter_creator import CoverLetterCreator
+from resume_ai.app.classes.context import RunContext
 from resume_ai.app.prompts import (
     RESUME_TO_JOB_PROMPT,
     MATCH_RESUMES_PROMPT,
     MATCH_USER_REQ_PROMPT,
     EXAMINE_JOB_REQUIREMENTS,
-    LIST_RESUME_IMPROVEMENTS
+    LIST_RESUME_IMPROVEMENTS,
+    CHECK_SCRAPED_PAGE
 )
 from resume_ai.app.funcs import (
+    load_yaml,
     save_yaml_to_file,
     run_shell_cmd,
     get_job_dir,
     get_custom_instructions,
     display_resumes_to_job_matching_scores,
-    clean_empty
+    clean_empty,
+    get_output_folder_name,
+    display_job_to_user_req_matching_scores,
+    get_clean_user_name
 )
 from resume_ai.app.constants import (
     RESUMES_NEW_YAML_DIR_PATH,
@@ -30,35 +39,19 @@ from resume_ai.app.models import (
     ResumeJobMatchScore,
     UserJobMatchScore,
     JobRequirements,
-    ResumeImprovements
+    ResumeImprovements,
+    JobDetails
 )
 
-
+@dataclass
 class JobManager:
     """
     A class responsible for creating resumes based on job descriptions
     and matching them to existing resumes.
     """
-    def __init__(
-            self,
-            llm_client: OpenAIClient,
-            current_resume: dict,
-            example_yaml: dict,
-            config_data: dict,
-            user_name: str
-    ) -> None:
-        """
-        :param llm_client: Instance of the language model client (e.g., OpenAIClient).
-        :param current_resume: Dict representing the user's current resume.
-        :param example_yaml: YAML dict used as a template for new resumes.
-        :param config_data: Configuration data loaded from JSON.
-        :param user_name: The user's name for file naming.
-        """
-        self.llm_client = llm_client
-        self.current_resume = current_resume
-        self.example_yaml = example_yaml
-        self.config_data = config_data
-        self.user_name = user_name
+    context: RunContext
+    current_resume: dict
+    example_yaml: dict
 
     def match_job_to_user_req(
             self,
@@ -78,21 +71,22 @@ class JobManager:
         logging.info("Matching user requirements job: %s", job_title)
 
         # Importing optional components (this is not best practice)
-        from importlib import import_module
-        user_data = import_module(f"{USER_DATA_DIR_PATH}.{self.config_data['profile_filename']}")
+        user_data_path = Path(USER_DATA_DIR_PATH) / self.context.config_data.get('profile_filename')
+        user_data = load_yaml(user_data_path)
 
         parser = JsonOutputParser(pydantic_object=UserJobMatchScore)
         prompt = PromptTemplate(
             template=MATCH_USER_REQ_PROMPT,
             input_variables=["job_title", "job_description"],
             partial_variables={
-                "user_descr": user_data.USER_DESCR,
-                "user_job_req": user_data.USER_JOB_REQ,
+                "personal_info": user_data.get('personal_info'),
+                "work_preferences": user_data.get('work_preferences'),
+                "job_requirements": user_data.get('job_requirements'),
                 "format_instructions": parser.get_format_instructions()
             },
         )
 
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        response = self.context.llm_client.invoke_llm(prompt, {"job_title": job_title, "job_description": job_description}, parser)
 
         return response
 
@@ -124,8 +118,11 @@ class JobManager:
             },
         )
 
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        response = self.context.llm_client.invoke_llm(prompt, {"job_title": job_title, "job_description": job_description}, parser)
         display_resumes_to_job_matching_scores(response)
+
+        self.context.db_client.add_job_data('resume_match_score', response['old_resume_match_score'])
+        self.context.db_client.add_job_data('resume_tailored_match_score', response['new_resume_match_score'])
 
     def create_resume(
             self,
@@ -143,7 +140,7 @@ class JobManager:
         :param resume_improvements: a list of resume improvements recommended by the LLM.
         :return: A tuple of (success_flag, new_resume_dict).
         """
-        custom_instructions_dict = self.config_data
+        custom_instructions_dict = self.context.config_data
         if resume_improvements:
             custom_instructions_dict['resume_improvements'] = resume_improvements
 
@@ -162,7 +159,7 @@ class JobManager:
         logging.info(f""" {"="*20} Creating resume for job: %s {"="*20} """, job_title)
         job_file_name_without_extension = get_job_dir(job_title)
 
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        response = self.context.llm_client.invoke_llm(prompt, {"job_title": job_title, "job_description": job_description}, parser)
 
         # LLM has a tendency to add empty items, like `extracurricular_activities: []`. We should remove them as rendercv throws an error.
         new_cv_dict = clean_empty(response["cv"])
@@ -171,15 +168,18 @@ class JobManager:
         job_specific_yaml = self.example_yaml.copy()
         job_specific_yaml['cv'] = new_cv_dict
 
+        user_name = get_clean_user_name(self.context.config_data.get("name"))
+
         # Save the YAML to file
         job_descr_resume_filename = (
                 RESUMES_NEW_YAML_DIR_PATH
-                / f"{self.user_name}__{job_file_name_without_extension}_CV.yaml"
+                / f"{user_name}__{job_file_name_without_extension}_CV.yaml"
         )
         save_yaml_to_file(job_specific_yaml, job_descr_resume_filename)
 
         # Match the newly created resume to the job
         self.match_resumes_to_job(job_title, job_description, new_cv_dict)
+
 
         # Attempt to render the new resume
         render_cmd = (
@@ -206,7 +206,7 @@ class JobManager:
             }
         )
 
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        response = self.context.llm_client.invoke_llm(prompt, {"job_title": job_title, "job_description": job_description}, parser)
 
         return response
 
@@ -222,6 +222,136 @@ class JobManager:
             }
         )
 
-        response = self.llm_client.invoke_llm(prompt, job_title, job_description, parser)
+        response = self.context.llm_client.invoke_llm(prompt, {"job_title": job_title, "job_description": job_description}, parser)
 
         return response
+
+    def check_url_job_active(self, job_link: str, page_title: str, page_content: str):
+        parser = JsonOutputParser(pydantic_object=JobDetails)
+        prompt = PromptTemplate(
+            template=CHECK_SCRAPED_PAGE,
+            input_variables=["page_title", "page_content"],
+            partial_variables={
+                "url": job_link,
+                "format_instructions": parser.get_format_instructions()
+            }
+        )
+
+        response = self.context.llm_client.invoke_llm(prompt, {"page_title": page_title, "page_content": page_content}, parser)
+
+        return response
+
+    def process_job(self, job_identifier: str, job_title: str, job_description: str):
+        """
+        Processes a job description, including optional filtering of job preferences and automated resume and cover letter
+        creation. The function uses the provided job manager and cover letter creator to perform these tasks. If configured,
+        the job is evaluated for compatibility with user preferences before proceeding.
+
+        :param job_title: Title of the job being processed. Used for matching preferences and generating documents.
+        :type job_title: str
+        :param job_description: Detailed description of the job role. Used for both matching preferences and document
+            generation.
+        :type job_description: str
+        :param job_identifier: Job title for text files and URL for links to the job postings
+        :type job_identifier: str
+        :return: Returns a boolean indicating whether the  process was successful.
+        :rtype: bool
+
+        """
+        self.context.db_client.add_job_data('job_title',job_title)
+        self.context.db_client.add_job_data('job_description',job_description)
+
+        success = False
+        job_methods = ["get_job_req", "resume_improvements"]
+
+        if self.context.config_data.get("match_job_to_user_pref"):
+            logging.info("Matching job to user preferences")
+            job_methods.append("match_job_to_user_req")
+
+        # Run the async code
+        results = asyncio.run(self.run_async_jobs(job_title, job_description, job_methods))
+
+        # write key job requirements to the log
+        self.context.write_output('\n**Job Key Requirements:** ' + results.get('get_job_req').get('job_requirements'))
+
+        # write keywords to the log
+        job_keywords = ', '.join(results.get('get_job_req').get('sentence_keywords'))
+        self.context.write_output('\n**Job Keywords:** ' + job_keywords)
+        self.context.db_client.add_job_data('job_keywords', job_keywords)
+
+        #print(f"Resume improvements: {results['resume_improvements']}")
+
+        if self.context.config_data.get("match_job_to_user_pref"):
+            response = results['match_job_to_user_req']
+            display_job_to_user_req_matching_scores(response)
+            score = response['job_to_req_match_score']
+            self.context.write_output(f" - Job match score: {score}")
+
+            self.context.db_client.add_job_data('job_match_score', response['job_to_req_match_score'])
+            self.context.db_client.append_llm_text('job_positives', response['job_positives'])
+            self.context.db_client.append_llm_text('job_negatives', response['job_negatives'])
+
+            if score < self.context.config_data.get("match_job_to_user_pref_limit", 0):
+                msg = f""" - Job match score {score} is below threshold: {self.context.config_data.get("match_job_to_user_pref_limit", 0)}"""
+                logging.info(msg)
+                self.context.write_output(msg)
+                self.context.write_output(response['job_negatives'])
+                self.context.db_client.add_job_data('status', 'job does not match profile')
+                self.context.db_client.insert_job()
+
+                return True # we return True for success because processing was error-free
+
+        output_folder_name = get_output_folder_name(job_identifier)
+        self.context.db_client.add_job_data('resume_tailored_dir', output_folder_name)
+
+        try:
+            success, new_resume = self.create_resume(job_title, job_description, output_folder_name, results.get('resume_improvements', None))
+            self.context.db_client.add_job_data('resume_tailored_text', new_resume)
+        except Exception as e:
+            logging.exception("Error creating resume: %s", e)
+            self.context.write_output(f" - Error creating resume. Please see logs.")
+
+        if results.get('resume_improvements', None):
+            self.context.db_client.append_llm_text('resume_improvements', results.get('resume_improvements'))
+
+        if success:
+            clickable_link = f"[Click here to open the directory](../{output_folder_name})"
+
+            self.context.write_output(f" - CV Directory: {clickable_link}")
+            self.context.db_client.add_job_data('status', 'resume created')
+
+            if self.context.config_data.get("write_cover_letter", False):
+
+                cover_letter_creator = CoverLetterCreator(
+                    llm_client = self.context.llm_client,
+                    user_name = get_clean_user_name(self.context.config_data.get("name"))
+                )
+
+                cover_letter_creator.create_cover_letter(job_title, job_description, new_resume, output_folder_name)
+
+        self.context.db_client.insert_job()
+        return success
+
+    async def run_async_jobs(self, job_title: str, job_description: str, job_methods: list[str]):
+        """
+        Executes asynchronous jobs using specified methods from the job manager based on
+        given job details.
+
+        :param job_title: The title of the job.
+        :type job_title: str
+        :param job_description: The description of the job.
+        :type job_description: str
+        :param job_methods: A list of method names that define the actions
+            to be performed for the job.
+        :type job_methods: list[str]
+        :return: A dictionary with method names as keys and their respective
+            execution results as values.
+        :rtype: dict[str, Any]
+        """
+        async def run_job(method_name: str):
+            result = await asyncio.to_thread(getattr(self, method_name), job_title, job_description)
+            return {method_name: result}
+
+        results = await asyncio.gather(*(run_job(method) for method in job_methods))
+
+        return {k: v for d in results for k, v in d.items()}
